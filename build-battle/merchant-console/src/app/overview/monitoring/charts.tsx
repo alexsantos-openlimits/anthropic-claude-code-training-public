@@ -5,8 +5,9 @@ import { ComboChart } from "@/components/ComboChart"
 import { ConditionalBarChart } from "@/components/ConditionalBarChart"
 import { formatters } from "@/lib/utils"
 
+// Series arrive in minor units. This is where they become major units for display.
 const money = (value: number) =>
-  formatters.currency({ number: value, maxFractionDigits: 0 })
+  formatters.currency({ number: value / 100, maxFractionDigits: 0 })
 
 export function VolumeByWeek({ data }: { data: Record<string, any>[] }) {
   return (

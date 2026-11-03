@@ -15,7 +15,7 @@ export function VolumeChart({
       categories={["Captured", "Refunded"]}
       colors={["blue", "gray"]}
       valueFormatter={(value: number) =>
-        `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+        `$${(value / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`
       }
       yAxisWidth={64}
       showLegend

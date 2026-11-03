@@ -5,9 +5,8 @@ import { formatMoney } from "./money"
 /**
  * CSV export for the payments table.
  *
- * The column set is fixed. Ops has asked for control over it — that is
- * NWP-101 — but today everyone gets every column, including the card
- * last four, whether or not the file is going to a merchant.
+ * Ops chooses the columns and the scope (NWP-101). The card last four is left
+ * out unless someone asks for it, because these files go to merchants.
  */
 
 export const EXPORT_COLUMNS = [
@@ -24,6 +23,52 @@ export const EXPORT_COLUMNS = [
 ] as const
 
 export type ExportColumn = (typeof EXPORT_COLUMNS)[number]
+
+export const DEFAULT_EXPORT_COLUMNS: readonly ExportColumn[] =
+  EXPORT_COLUMNS.filter((column) => column !== "last4")
+
+export const EXPORT_SCOPES = ["filter", "all"] as const
+
+export type ExportScope = (typeof EXPORT_SCOPES)[number]
+
+export type ColumnSelection =
+  | { ok: true; columns: ExportColumn[] }
+  | { ok: false; error: string }
+
+/**
+ * Turns the `columns` query param into an allowlisted, de-duplicated list in
+ * the order the client asked for. Missing means the defaults. Empty is an
+ * error, because an empty file is never what anyone wants.
+ */
+export function parseExportColumns(raw: string | null): ColumnSelection {
+  if (raw === null) return { ok: true, columns: [...DEFAULT_EXPORT_COLUMNS] }
+
+  const requested = raw
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name !== "")
+  const columns: ExportColumn[] = []
+
+  for (const name of requested) {
+    if (!EXPORT_COLUMNS.includes(name as ExportColumn)) {
+      return { ok: false, error: `Unknown export column: ${name}` }
+    }
+    if (!columns.includes(name as ExportColumn)) {
+      columns.push(name as ExportColumn)
+    }
+  }
+
+  if (columns.length === 0) {
+    return { ok: false, error: "Select at least one column" }
+  }
+  return { ok: true, columns }
+}
+
+export function parseExportScope(raw: string | null): ExportScope {
+  return EXPORT_SCOPES.includes(raw as ExportScope)
+    ? (raw as ExportScope)
+    : "filter"
+}
 
 function escapeCell(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
@@ -66,6 +111,10 @@ export function toCsv(
   return [header, ...rows].join("\n")
 }
 
-export function exportFilename(date = new Date()): string {
-  return `payments-${date.toISOString().slice(0, 10)}.csv`
+/**
+ * `label` is a status or one of the scope words, never free text from the
+ * client. The route passes only allowlisted values.
+ */
+export function exportFilename(label: string, date = new Date()): string {
+  return `payments-${label}-${date.toISOString().slice(0, 10)}.csv`
 }

@@ -11,6 +11,19 @@ const STATUSES: readonly (PaymentStatus | "all")[] = [
   "disputed",
 ]
 
+const UTC_BOUND = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{3})?)?Z)?$/
+
+function knownMerchantId(raw: string | null): string | undefined {
+  return raw && merchantById(raw) ? raw : undefined
+}
+
+// GOTCHA: createdAt is compared as a string, so a bound is only safe when it
+// is the same UTC ISO shape; anything else is dropped rather than compared.
+function utcBound(raw: string | null): string | undefined {
+  if (!raw || !UTC_BOUND.test(raw)) return undefined
+  return Number.isNaN(Date.parse(raw)) ? undefined : raw
+}
+
 /**
  * Anything from the client is checked against an allowlist before it reaches
  * a query. Route handlers call this rather than reading params themselves.
@@ -25,10 +38,10 @@ export function parseFilters(params: URLSearchParams): PaymentFilters {
     status: STATUSES.includes(status as PaymentStatus)
       ? (status as PaymentStatus)
       : "all",
-    merchantId: params.get("merchantId") ?? undefined,
-    search: params.get("search") ?? undefined,
-    from: params.get("from") ?? undefined,
-    to: params.get("to") ?? undefined,
+    merchantId: knownMerchantId(params.get("merchantId")),
+    search: params.get("search") || undefined,
+    from: utcBound(params.get("from")),
+    to: utcBound(params.get("to")),
     page: Number.isFinite(page) && page > 0 ? page : 1,
     sort: sort === "amount" ? "amount" : "createdAt",
     direction: direction === "asc" ? "asc" : "desc",
@@ -76,10 +89,7 @@ export function sortPayments(
 ): Payment[] {
   const factor = direction === "asc" ? 1 : -1
   return [...payments].sort((a, b) => {
-    if (sort === "amount") {
-      // Sort by the formatted amount so the order matches what the table shows.
-      return String(a.amount).localeCompare(String(b.amount)) * factor
-    }
+    if (sort === "amount") return (a.amount - b.amount) * factor
     return a.createdAt.localeCompare(b.createdAt) * factor
   })
 }

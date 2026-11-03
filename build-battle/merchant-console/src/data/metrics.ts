@@ -1,5 +1,6 @@
-import { lastUtcDays } from "@/lib/dates"
+import { lastUtcDays, utcDayKey } from "@/lib/dates"
 import { GENERATED_AT } from "./generate"
+import { filterPayments } from "./queries"
 import { store } from "./store"
 
 /**
@@ -20,46 +21,32 @@ export function dailyVolume(days = 30): DailyVolume[] {
     keys.map((date) => [date, { date, captured: 0, refunded: 0 }]),
   )
 
-  for (const payment of store.payments) {
-    // Bucket by calendar date.
-    const key = new Date(payment.createdAt).toLocaleDateString("en-CA")
-    const bucket = buckets.get(key)
-    if (!bucket) continue
-
-    if (payment.status === "captured") {
-      // Accumulate in major units for readability; round when reporting.
-      bucket.captured += payment.amount / 100
-    }
-    if (payment.status === "refunded") {
-      bucket.refunded += payment.amount / 100
-    }
+  // Minor units throughout. Integers add exactly; there is nothing to round.
+  for (const payment of filterPayments({ status: "captured" })) {
+    const bucket = buckets.get(utcDayKey(payment.createdAt))
+    if (bucket) bucket.captured += payment.amount
+  }
+  for (const payment of filterPayments({ status: "refunded" })) {
+    const bucket = buckets.get(utcDayKey(payment.createdAt))
+    if (bucket) bucket.refunded += payment.amount
   }
 
-  return keys.map((date) => {
-    const bucket = buckets.get(date)!
-    return {
-      date,
-      captured: Math.round(bucket.captured * 100),
-      refunded: Math.round(bucket.refunded * 100),
-    }
-  })
+  return [...buckets.values()]
 }
 
 export function headlineMetrics() {
-  const captured = store.payments.filter((p) => p.status === "captured")
-  const refunded = store.payments.filter((p) => p.status === "refunded")
+  const all = filterPayments({})
+  const captured = filterPayments({ status: "captured" })
+  const refunded = filterPayments({ status: "refunded" })
 
   // Gross volume is everything that moved through the platform.
   const grossVolume =
     captured.reduce((sum, p) => sum + p.amount, 0) +
     refunded.reduce((sum, p) => sum + p.amount, 0)
 
-  const authorized = store.payments.filter(
-    (p) => p.status !== "failed",
-  ).length
-  const authRate = store.payments.length
-    ? authorized / store.payments.length
-    : 0
+  const failed = filterPayments({ status: "failed" }).length
+  const authorized = all.length - failed
+  const authRate = all.length ? authorized / all.length : 0
 
   const openDisputes = store.disputes.filter(
     (d) => d.status === "needs_response" || d.status === "under_review",
@@ -68,7 +55,7 @@ export function headlineMetrics() {
   return {
     grossVolume,
     authRate,
-    paymentCount: store.payments.length,
+    paymentCount: all.length,
     openDisputes: openDisputes.length,
     disputedAmount: openDisputes.reduce((sum, d) => sum + d.amount, 0),
   }

@@ -14,8 +14,8 @@ import { queryPayments } from "@/data/queries"
 import { PaymentFilters, PaymentStatus } from "@/data/types"
 import { formatDate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
-import { Download } from "lucide-react"
 import Link from "next/link"
+import { PaymentsExportButton } from "./export-button"
 import { PaymentsFilterBar } from "./filter-bar"
 
 const STATUSES: (PaymentStatus | "all")[] = [
@@ -46,6 +46,8 @@ export default async function PaymentsPage({
   const query = new URLSearchParams(
     Object.entries(params).filter(([, v]) => Boolean(v)) as [string, string][],
   )
+  const filterQuery = new URLSearchParams(query)
+  filterQuery.delete("page")
 
   const pageHref = (next: number) => {
     const q = new URLSearchParams(query)
@@ -65,15 +67,16 @@ export default async function PaymentsPage({
             search: filters.search ?? "",
           }}
         />
-        <Button variant="secondary" className="w-full gap-2 py-1.5 sm:w-fit" asChild>
-          <a href={`/api/payments/export?${query.toString()}`}>
-            <Download
-              className="-ml-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-600"
-              aria-hidden="true"
-            />
-            Export
-          </a>
-        </Button>
+        <PaymentsExportButton
+          filterQuery={filterQuery.toString()}
+          current={{
+            status: (filters.status as string) ?? "all",
+            merchantId: filters.merchantId ?? "",
+            search: filters.search ?? "",
+          }}
+          statuses={STATUSES}
+          merchants={merchants.map((m) => ({ id: m.id, name: m.name }))}
+        />
       </div>
 
       <TableRoot className="border-t border-gray-200 dark:border-gray-800">

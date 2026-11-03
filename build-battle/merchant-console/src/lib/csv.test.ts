@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest"
 import { Payment } from "@/data/types"
-import { EXPORT_COLUMNS, exportFilename, toCsv } from "./csv"
+import {
+  DEFAULT_EXPORT_COLUMNS,
+  EXPORT_COLUMNS,
+  exportFilename,
+  parseExportColumns,
+  parseExportScope,
+  toCsv,
+} from "./csv"
 
 /**
  * The export is the file ops hands to a merchant, so a broken cell is a
- * support ticket rather than a stack trace. These tests pin the escaping and
- * the column contract; NWP-101 changes which columns ship, not how a cell is
- * written, and these should still pass afterwards.
+ * support ticket rather than a stack trace. These tests pin the escaping, the
+ * column selection, and the filename.
  */
 
 const payment: Payment = {
@@ -76,10 +82,72 @@ describe("toCsv", () => {
   })
 })
 
+describe("column selection", () => {
+  it("leaves the card last four out by default", () => {
+    expect(DEFAULT_EXPORT_COLUMNS).not.toContain("last4")
+    expect(parseExportColumns(null)).toEqual({
+      ok: true,
+      columns: [...DEFAULT_EXPORT_COLUMNS],
+    })
+  })
+
+  it("returns a subset in the order requested, not the table's order", () => {
+    expect(parseExportColumns("amount,id,currency")).toEqual({
+      ok: true,
+      columns: ["amount", "id", "currency"],
+    })
+  })
+
+  it("includes the card last four only when it is asked for", () => {
+    expect(parseExportColumns("id,last4")).toEqual({
+      ok: true,
+      columns: ["id", "last4"],
+    })
+  })
+
+  it("drops duplicate names and keeps the first position", () => {
+    expect(parseExportColumns("id,amount,id")).toEqual({
+      ok: true,
+      columns: ["id", "amount"],
+    })
+  })
+
+  it("rejects an empty selection rather than producing an empty file", () => {
+    expect(parseExportColumns("")).toEqual({
+      ok: false,
+      error: "Select at least one column",
+    })
+    expect(parseExportColumns(" , ")).toEqual({
+      ok: false,
+      error: "Select at least one column",
+    })
+  })
+
+  it("rejects any name outside the allowlist", () => {
+    expect(parseExportColumns("id,card_number")).toEqual({
+      ok: false,
+      error: "Unknown export column: card_number",
+    })
+  })
+
+  it("falls back to the filter scope for anything unexpected", () => {
+    expect(parseExportScope("all")).toBe("all")
+    expect(parseExportScope("filter")).toBe("filter")
+    expect(parseExportScope("everything")).toBe("filter")
+    expect(parseExportScope(null)).toBe("filter")
+  })
+})
+
 describe("exportFilename", () => {
-  it("stamps the UTC date, so two exports on the same day collide by design", () => {
-    expect(exportFilename(new Date("2026-03-14T23:00:00.000Z"))).toBe(
-      "payments-2026-03-14.csv",
+  it("names the file for its scope and stamps the UTC date", () => {
+    expect(exportFilename("all", new Date("2026-03-14T23:00:00.000Z"))).toBe(
+      "payments-all-2026-03-14.csv",
+    )
+  })
+
+  it("uses the status when the table is filtered to one", () => {
+    expect(exportFilename("disputed", new Date("2026-08-13T08:00:00.000Z"))).toBe(
+      "payments-disputed-2026-08-13.csv",
     )
   })
 })

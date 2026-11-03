@@ -1,5 +1,6 @@
 import { GENERATED_AT } from "./generate"
 import { merchants } from "./merchants"
+import { filterPayments } from "./queries"
 import { store } from "./store"
 
 /**
@@ -34,12 +35,20 @@ export function weeks(count = 12): WeekBucket[] {
   return buckets
 }
 
-const inWeek = (iso: string, week: WeekBucket) => {
-  const at = new Date(iso).getTime()
-  return at >= week.start && at < week.end
-}
+/**
+ * The query builder's `from` and `to` are both inclusive, and a week's end is
+ * exclusive, so `to` is the last millisecond of the week. Payments are stored
+ * as ISO strings with millisecond precision, so string comparison orders them.
+ */
+const windowOf = (bucket: WeekBucket) => ({
+  from: new Date(bucket.start).toISOString(),
+  to: new Date(bucket.end - 1).toISOString(),
+})
 
-/** Captured volume this period against the period before it. */
+/**
+ * Captured volume this period against the period before it. Values are minor
+ * units; the chart formats them for display.
+ */
 export function volumeByWeek(count = 12) {
   const current = weeks(count)
   return current.map((week) => {
@@ -49,14 +58,15 @@ export function volumeByWeek(count = 12) {
       end: week.end - count * WEEK_MS,
     }
     const sum = (bucket: WeekBucket) =>
-      store.payments
-        .filter((p) => p.status === "captured" && inWeek(p.createdAt, bucket))
-        .reduce((total, p) => total + p.amount, 0) / 100
+      filterPayments({ status: "captured", ...windowOf(bucket) }).reduce(
+        (total, p) => total + p.amount,
+        0,
+      )
 
     return {
       date: week.date,
-      "This period": Math.round(sum(week)),
-      "Previous period": Math.round(sum(previous)),
+      "This period": sum(week),
+      "Previous period": sum(previous),
     }
   })
 }
@@ -64,14 +74,11 @@ export function volumeByWeek(count = 12) {
 /** Payment count against captured volume, for the biaxial chart. */
 export function countAndVolumeByWeek(count = 12) {
   return weeks(count).map((week) => {
-    const inBucket = store.payments.filter((p) => inWeek(p.createdAt, week))
-    const captured = inBucket.filter((p) => p.status === "captured")
+    const captured = filterPayments({ status: "captured", ...windowOf(week) })
     return {
       date: week.date,
-      Payments: inBucket.length,
-      "Captured volume": Math.round(
-        captured.reduce((total, p) => total + p.amount, 0) / 100,
-      ),
+      Payments: filterPayments(windowOf(week)).length,
+      "Captured volume": captured.reduce((total, p) => total + p.amount, 0),
     }
   })
 }
@@ -79,11 +86,12 @@ export function countAndVolumeByWeek(count = 12) {
 /** Approved against failed, rendered as a percentage stack. */
 export function authorizationByWeek(count = 12) {
   return weeks(count).map((week) => {
-    const inBucket = store.payments.filter((p) => inWeek(p.createdAt, week))
+    const inBucket = filterPayments(windowOf(week)).length
+    const failed = filterPayments({ status: "failed", ...windowOf(week) }).length
     return {
       date: week.date,
-      Approved: inBucket.filter((p) => p.status !== "failed").length,
-      Failed: inBucket.filter((p) => p.status === "failed").length,
+      Approved: inBucket - failed,
+      Failed: failed,
     }
   })
 }
@@ -91,11 +99,12 @@ export function authorizationByWeek(count = 12) {
 /** Share of payments that ended in a dispute, per week. */
 export function disputeRateByWeek(count = 12) {
   return weeks(count).map((week) => {
-    const inBucket = store.payments.filter((p) => inWeek(p.createdAt, week))
-    const disputed = inBucket.filter((p) => p.status === "disputed").length
+    const inBucket = filterPayments(windowOf(week)).length
+    const disputed = filterPayments({ status: "disputed", ...windowOf(week) })
+      .length
     return {
       date: week.date,
-      "Dispute rate": inBucket.length ? disputed / inBucket.length : 0,
+      "Dispute rate": inBucket ? disputed / inBucket : 0,
     }
   })
 }
@@ -104,14 +113,18 @@ export function disputeRateByWeek(count = 12) {
 export function merchantRollup() {
   return merchants
     .map((merchant) => {
-      const payments = store.payments.filter(
-        (p) => p.merchantId === merchant.id,
-      )
-      const captured = payments.filter((p) => p.status === "captured")
+      const payments = filterPayments({ merchantId: merchant.id })
+      const captured = filterPayments({
+        merchantId: merchant.id,
+        status: "captured",
+      })
       const disputes = store.disputes.filter(
         (d) => d.merchantId === merchant.id,
       )
-      const failed = payments.filter((p) => p.status === "failed").length
+      const failed = filterPayments({
+        merchantId: merchant.id,
+        status: "failed",
+      }).length
 
       return {
         merchant,

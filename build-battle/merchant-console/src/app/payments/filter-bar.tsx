@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-const LABELS: Record<string, string> = {
+export const LABELS: Record<string, string> = {
   all: "All statuses",
   captured: "Captured",
   authorized: "Authorized",

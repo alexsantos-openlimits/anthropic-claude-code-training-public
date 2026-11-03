@@ -13,6 +13,25 @@ npm run dev
 
 No database, no seed step, no Docker.
 
+| Command | What it does |
+| --- | --- |
+| `npm test` | Vitest, Node only, no DOM. Picks up `src/**/*.test.ts` |
+| `npx vitest run src/lib/csv.test.ts` | One test file |
+| `npx vitest run -t "quotes cells"` | Tests whose name matches |
+| `npm run lint` | `next lint` |
+| `npm run build` | Production build, also type-checks |
+
+`@/` resolves to `src/`.
+
+## How a request flows
+
+1. Filters live in the URL. `src/app/payments/filter-bar.tsx` (client) pushes `status`, `merchantId`, `search` as query params.
+2. Pages are server components that read the store directly. `src/app/payments/page.tsx` calls `queryPayments()` for one page of `PAGE_SIZE` (20) rows.
+3. Route handlers parse params with `parseFilters()` in `src/data/queries.ts`, the one place client input is checked. `GET /api/payments` returns `queryPayments()` as JSON.
+4. `queryPayments()` = `filterPayments()` → `sortPayments()` → `paginate()`. Anything that needs every matching row (the CSV export) skips `paginate()` and calls the first two.
+5. `GET /api/payments/export` serializes with `toCsv(rows, columns)` from `src/lib/csv.ts`; the column allowlist is `EXPORT_COLUMNS`.
+6. Money and dates are formatted only at the edge, with `formatMoney` (`src/lib/money.ts`) and `formatDate` / `formatInZone` (`src/lib/dates.ts`).
+
 ## Data lives in memory
 
 Seed data is JSON, loaded into a store module at boot. Route handlers read and write that store.

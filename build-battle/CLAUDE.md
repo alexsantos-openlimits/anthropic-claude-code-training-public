@@ -10,6 +10,8 @@ Taking ticket NWP-201 end to end in a codebase you did not write, in 40 minutes,
 - Your plan goes in: `docs/specs/`
 - App: `merchant-console/` — read its CLAUDE.md before writing code
 
+Working NWP-101 or NWP-102 instead? Same order below, with that ticket's ID in place of NWP-201.
+
 ## The order that works
 
 1. `@docs/tickets/NWP-201.md` — read it, including the out-of-scope list

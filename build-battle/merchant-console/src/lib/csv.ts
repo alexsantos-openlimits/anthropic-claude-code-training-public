@@ -1,13 +1,13 @@
 import { merchantById } from "@/data/merchants"
-import { Payment } from "@/data/types"
+import { Payment, PaymentFilters } from "@/data/types"
 import { formatMoney } from "./money"
 
 /**
  * CSV export for the payments table.
  *
- * The column set is fixed. Ops has asked for control over it — that is
- * NWP-101 — but today everyone gets every column, including the card
- * last four, whether or not the file is going to a merchant.
+ * The default column set is every column except the card last four. A
+ * caller may ask for its own subset and order (NWP-101); the request is
+ * checked against EXPORT_COLUMNS in parseExportColumns.
  */
 
 export const EXPORT_COLUMNS = [
@@ -24,6 +24,32 @@ export const EXPORT_COLUMNS = [
 ] as const
 
 export type ExportColumn = (typeof EXPORT_COLUMNS)[number]
+
+export const DEFAULT_EXPORT_COLUMNS: readonly ExportColumn[] = EXPORT_COLUMNS.filter(
+  (c) => c !== "last4",
+)
+
+/** null means invalid: empty, unknown or repeated column. */
+export function parseExportColumns(raw: string | null): ExportColumn[] | null {
+  if (raw === null) return [...DEFAULT_EXPORT_COLUMNS]
+  const parts = raw.split(",")
+  const valid = parts.every(
+    (p, i) => (EXPORT_COLUMNS as readonly string[]).includes(p) && parts.indexOf(p) === i,
+  )
+  return valid ? (parts as ExportColumn[]) : null
+}
+
+/** Download link for the export drawer: current filters (minus table page) or none, plus the chosen columns. */
+export function exportHref(
+  filterQuery: string,
+  scope: "filter" | "all",
+  columns: readonly ExportColumn[],
+): string {
+  const params = new URLSearchParams(scope === "filter" ? filterQuery : "")
+  params.delete("page")
+  params.set("columns", columns.join(","))
+  return `/api/payments/export?${params}`
+}
 
 function escapeCell(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
@@ -57,7 +83,7 @@ function cell(payment: Payment, column: ExportColumn): string {
 
 export function toCsv(
   payments: Payment[],
-  columns: readonly ExportColumn[] = EXPORT_COLUMNS,
+  columns: readonly ExportColumn[] = EXPORT_COLUMNS, // default includes last4: callers exporting to users must pass columns explicitly
 ): string {
   const header = columns.join(",")
   const rows = payments.map((payment) =>
@@ -66,6 +92,17 @@ export function toCsv(
   return [header, ...rows].join("\n")
 }
 
-export function exportFilename(date = new Date()): string {
-  return `payments-${date.toISOString().slice(0, 10)}.csv`
+/** Filename label from allowlisted values only; search text never gets in. */
+export function exportLabel(filters: PaymentFilters): string {
+  const parts: string[] = []
+  if (filters.status && filters.status !== "all") parts.push(filters.status)
+  const merchantKnown = filters.merchantId ? !!merchantById(filters.merchantId) : true
+  if (filters.merchantId && merchantKnown) parts.push(filters.merchantId)
+  if (filters.search || filters.from || filters.to || !merchantKnown) parts.push("filtered")
+  return parts.join("-") || "all"
+}
+
+export function exportFilename(date = new Date(), label?: string): string {
+  const day = date.toISOString().slice(0, 10)
+  return label ? `payments-${label}-${day}.csv` : `payments-${day}.csv`
 }

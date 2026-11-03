@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { Payment } from "@/data/types"
-import { EXPORT_COLUMNS, exportFilename, toCsv } from "./csv"
+import { Payment, PaymentFilters } from "@/data/types"
+import { DEFAULT_EXPORT_COLUMNS, EXPORT_COLUMNS, exportFilename, exportHref, exportLabel, parseExportColumns, toCsv } from "./csv"
 
 /**
  * The export is the file ops hands to a merchant, so a broken cell is a
@@ -80,6 +80,61 @@ describe("exportFilename", () => {
   it("stamps the UTC date, so two exports on the same day collide by design", () => {
     expect(exportFilename(new Date("2026-03-14T23:00:00.000Z"))).toBe(
       "payments-2026-03-14.csv",
+    )
+  })
+
+  it("puts the label between the prefix and the UTC date", () => {
+    expect(exportFilename(new Date("2026-08-13T12:00:00.000Z"), "disputed")).toBe(
+      "payments-disputed-2026-08-13.csv",
+    )
+  })
+})
+
+describe("DEFAULT_EXPORT_COLUMNS", () => {
+  it("is every column except the card last four, in the same order", () => {
+    expect(DEFAULT_EXPORT_COLUMNS).toEqual(EXPORT_COLUMNS.filter((c) => c !== "last4"))
+  })
+})
+
+describe("parseExportColumns", () => {
+  it("falls back to the defaults when no columns are sent", () => {
+    expect(parseExportColumns(null)).toEqual(DEFAULT_EXPORT_COLUMNS)
+  })
+
+  it("keeps the order the client asked for", () => {
+    expect(parseExportColumns("amount,id")).toEqual(["amount", "id"])
+  })
+
+  it.each(["", "id,,amount", "id,id", "id,password"])("rejects %j", (raw) => {
+    expect(parseExportColumns(raw)).toBeNull()
+  })
+})
+
+describe("exportLabel", () => {
+  it.each<[PaymentFilters, string]>([
+    [{}, "all"],
+    [{ status: "all" }, "all"],
+    [{ status: "disputed" }, "disputed"],
+    [{ status: "disputed", merchantId: "mch_03" }, "disputed-mch_03"],
+    [{ merchantId: "mch_missing" }, "filtered"],
+    [{ search: '../x,"y' }, "filtered"],
+    [{ from: "2026-08-01T00:00:00.000Z" }, "filtered"],
+    [{ status: "failed", search: "a", merchantId: "mch_missing" }, "failed-filtered"],
+  ])("labels %j as %s", (filters, label) => {
+    expect(exportLabel(filters)).toBe(label)
+  })
+})
+
+describe("exportHref", () => {
+  it("keeps the current filters but not the table page", () => {
+    expect(exportHref("status=disputed&page=3", "filter", ["id", "amount"])).toBe(
+      "/api/payments/export?status=disputed&columns=id%2Camount",
+    )
+  })
+
+  it("drops every filter for all payments", () => {
+    expect(exportHref("status=disputed&merchantId=mch_03", "all", ["id"])).toBe(
+      "/api/payments/export?columns=id",
     )
   })
 })

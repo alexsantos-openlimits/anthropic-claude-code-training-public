@@ -23,8 +23,24 @@ export function cardById(id: string): Card | null {
   return store.cards.find((card) => card.id === id) ?? null
 }
 
-/** Idempotency keys seen so far, mapped to the card they created. */
-const issued = new Map<string, string>()
+/**
+ * Issue categories a card may be locked to. A lock is a closed set by
+ * definition, so it is allowlisted like every other client value.
+ */
+export const CARD_CATEGORIES = [
+  "Advertising",
+  "Software",
+  "Travel",
+  "Contractors",
+  "Shipping",
+  "Office",
+] as const
+
+export type CardCategory = (typeof CARD_CATEGORIES)[number]
+
+export function isCardCategory(value: string): value is CardCategory {
+  return (CARD_CATEGORIES as readonly string[]).includes(value)
+}
 
 export type IssueInput = {
   nickname: string
@@ -43,6 +59,13 @@ function nextId(): string {
   return `card_${String(store.cards.length + 1).padStart(4, "0")}`
 }
 
+/** An id with no relationship to the card number's digits. */
+function randomReference(): string {
+  return Array.from({ length: 12 }, () =>
+    "abcdefghjkmnpqrstuvwxyz23456789".charAt(Math.floor(Math.random() * 31)),
+  ).join("")
+}
+
 /**
  * Issue a card.
  *
@@ -51,9 +74,9 @@ function nextId(): string {
  * once, here: the card itself only ever carries the last four.
  */
 export function issueCard(input: IssueInput): IssueResult {
-  const key = input.idempotencyKey?.trim()
+  const key = input.idempotencyKey?.trim().slice(0, 100)
   if (key) {
-    const existing = issued.get(key)
+    const existing = store.issuedKeys[key]
     if (existing) {
       const card = cardById(existing)
       // Clicking twice issues one card, and the second answer carries no number.
@@ -64,6 +87,22 @@ export function issueCard(input: IssueInput): IssueResult {
   const nickname = input.nickname?.trim()
   if (!nickname) {
     return { ok: false, status: 400, message: "Give the card a nickname." }
+  }
+  if (nickname.length > 60) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Keep the nickname under 60 characters.",
+    }
+  }
+
+  const categoryLock = input.categoryLock?.trim() || null
+  if (categoryLock !== null && !isCardCategory(categoryLock)) {
+    return {
+      ok: false,
+      status: 400,
+      message: `Category must be one of ${CARD_CATEGORIES.join(", ")}.`,
+    }
   }
 
   const merchant = merchantById(input.merchantId)
@@ -108,15 +147,18 @@ export function issueCard(input: IssueInput): IssueResult {
     currency: merchant.currency,
     status: "active",
     last4: lastFour(pan),
-    reference: `ref_${pan.slice(4, 12)}`,
-    categoryLock: input.categoryLock?.trim() || null,
+    // Opaque on purpose. A reference derived from the digits would, with the
+    // public BIN and the last four, rebuild the whole number from a list
+    // payload — which is exactly what ORG-STANDARDS #8 forbids.
+    reference: `ref_${randomReference()}`,
+    categoryLock,
     spent: 0,
     createdAt: now,
     events: [{ at: now, action: "issued", from: null, to: "active" }],
   }
 
   store.cards.push(card)
-  if (key) issued.set(key, card.id)
+  if (key) store.issuedKeys[key] = card.id
 
   return { ok: true, card, number: pan, reused: false }
 }

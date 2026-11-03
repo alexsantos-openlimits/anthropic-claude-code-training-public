@@ -2,6 +2,31 @@ import { Currency } from "@/data/types"
 import { cx } from "@/lib/utils"
 import { formatMoney } from "@/lib/money"
 
+/** Fill widths, written out so Tailwind keeps them in the build. */
+const WIDTHS = {
+  0: "w-0",
+  5: "w-[5%]",
+  10: "w-[10%]",
+  15: "w-[15%]",
+  20: "w-1/5",
+  25: "w-1/4",
+  30: "w-[30%]",
+  35: "w-[35%]",
+  40: "w-2/5",
+  45: "w-[45%]",
+  50: "w-1/2",
+  55: "w-[55%]",
+  60: "w-3/5",
+  65: "w-[65%]",
+  70: "w-[70%]",
+  75: "w-3/4",
+  80: "w-4/5",
+  85: "w-[85%]",
+  90: "w-[90%]",
+  95: "w-[95%]",
+  100: "w-full",
+} as const
+
 /** Spend against the limit. A new card has spent nothing, and says so. */
 export function SpendBar({
   spent,
@@ -14,6 +39,9 @@ export function SpendBar({
 }) {
   // Integer minor units throughout; the percentage is the only derived number.
   const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0
+  // Tailwind only, per .claude/rules/components.md: the fill snaps to the
+  // nearest twentieth rather than carrying an inline style.
+  const step = (Math.round(pct / 5) * 5) as keyof typeof WIDTHS
   const high = pct >= 80
   const remaining = Math.max(0, limit - spent)
 
@@ -38,9 +66,9 @@ export function SpendBar({
         <div
           className={cx(
             "h-full rounded-full transition-all",
+            WIDTHS[step],
             high ? "bg-amber-500" : "bg-blue-500",
           )}
-          style={{ width: `${pct}%` }}
         />
       </div>
       <p className="mt-2 text-xs text-gray-500">

@@ -108,3 +108,14 @@ describe("limits", () => {
     expect(MAX_LIMIT_MINOR).toBe(5_000_000)
   })
 })
+
+describe("the card number never survives the record", () => {
+  it("a reference built from the digits would rebuild the whole number", () => {
+    // Why the reference is opaque: the BIN is public and the last four ship
+    // in every payload, so a reference taken from the middle digits is the
+    // card number with extra steps. This is the shape that must never exist.
+    const pan = generateCardNumber()
+    const leaky = pan.slice(4, 12)
+    expect(TEST_BIN + leaky + lastFour(pan)).toBe(pan)
+  })
+})

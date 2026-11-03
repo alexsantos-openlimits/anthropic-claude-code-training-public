@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/Select"
+import { CARD_CATEGORIES } from "@/data/cards"
 import { Card, Currency } from "@/data/types"
 import { maskedNumber, MAX_LIMIT_MINOR } from "@/lib/cards"
 import { formatMoney, parseAmountToMinorUnits } from "@/lib/money"
@@ -269,13 +270,27 @@ export function IssueCardDialog({ merchants }: { merchants: MerchantOption[] }) 
                   Category lock{" "}
                   <span className="font-normal text-gray-500">(optional)</span>
                 </label>
-                <Input
-                  id="card-category"
+                <Select
                   value={categoryLock}
-                  onChange={(e) => setCategoryLock(e.target.value)}
-                  placeholder="Advertising"
-                  className="mt-1.5"
-                />
+                  onValueChange={(value) =>
+                    setCategoryLock(value === "none" ? "" : value)
+                  }
+                >
+                  <SelectTrigger id="card-category" className="mt-1.5">
+                    <SelectValue placeholder="No lock" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No lock</SelectItem>
+                    {CARD_CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  A locked card only works in that category.
+                </p>
               </div>
 
               {error && (

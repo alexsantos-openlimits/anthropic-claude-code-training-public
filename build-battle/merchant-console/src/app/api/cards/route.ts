@@ -1,13 +1,13 @@
 import { issueCard } from "@/data/cards"
-import { validateIssueCard } from "@/lib/cards"
+import { maskCardNumber, validateIssueCard } from "@/lib/cards"
 import { NextRequest, NextResponse } from "next/server"
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,100}$/
 
 /**
  * Issues a virtual card. The response to the first request is the only place
- * the full number ever appears; a repeat with the same Idempotency-Key gets
- * the existing card back, masked, with no number.
+ * the full number ever appears. A repeat with the same Idempotency-Key and the
+ * same details gets the card back masked; with different details it is a 409.
  */
 export async function POST(request: NextRequest) {
   const key = request.headers.get("idempotency-key")
@@ -36,10 +36,24 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { card, number } = issueCard(result.value, key ?? undefined)
+  const issued = issueCard(result.value, key ?? undefined)
   const headers = { "cache-control": "no-store" }
-  if (number === null) {
-    return NextResponse.json({ card, replayed: true }, { status: 200, headers })
+  if (issued.status === "conflict") {
+    return NextResponse.json(
+      {
+        error: `This form already issued a card with different details (${maskCardNumber(issued.card.last4)}). Close it and check that card before issuing another.`,
+      },
+      { status: 409, headers },
+    )
   }
-  return NextResponse.json({ card, number }, { status: 201, headers })
+  if (issued.status === "replayed") {
+    return NextResponse.json(
+      { card: issued.card, replayed: true },
+      { status: 200, headers },
+    )
+  }
+  return NextResponse.json(
+    { card: issued.card, number: issued.number },
+    { status: 201, headers },
+  )
 }

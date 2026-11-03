@@ -3,7 +3,7 @@
 import { Button } from "@/components/Button"
 import { CardStatus } from "@/data/types"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 /**
  * Freeze, unfreeze and cancel. The server enforces the state machine; this
@@ -22,9 +22,30 @@ export function CardStatusActions({
   const [pending, setPending] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const keepRef = useRef<HTMLButtonElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const wasConfirming = useRef(false)
+
+  // The button that had focus unmounts when the confirm opens or closes.
+  useEffect(() => {
+    if (confirming) keepRef.current?.focus()
+    else if (wasConfirming.current) cancelRef.current?.focus()
+    wasConfirming.current = confirming
+  }, [confirming])
+
+  const errorMessage = error && (
+    <p role="alert" className="text-sm text-red-600 dark:text-red-500">
+      {error}
+    </p>
+  )
 
   if (status === "cancelled") {
-    return <span className="text-sm text-gray-500">No actions</span>
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <span className="text-sm text-gray-500">No actions</span>
+        {errorMessage}
+      </div>
+    )
   }
 
   async function change(to: CardStatus) {
@@ -57,6 +78,7 @@ export function CardStatusActions({
             Cancel {nickname}? This can&apos;t be undone.
           </span>
           <Button
+            ref={keepRef}
             variant="secondary"
             className="py-1"
             disabled={pending}
@@ -85,6 +107,7 @@ export function CardStatusActions({
             {status === "active" ? "Freeze" : "Unfreeze"}
           </Button>
           <Button
+            ref={cancelRef}
             variant="ghost"
             className="py-1 text-red-600 dark:text-red-500"
             disabled={pending}
@@ -95,11 +118,7 @@ export function CardStatusActions({
           </Button>
         </div>
       )}
-      {error && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-500">
-          {error}
-        </p>
-      )}
+      {errorMessage}
     </div>
   )
 }

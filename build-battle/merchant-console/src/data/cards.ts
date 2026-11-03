@@ -16,20 +16,39 @@ export function cardById(id: string): Card | null {
   return store.cards.find((card) => card.id === id) ?? null
 }
 
+export type IssueResult =
+  | { status: "created"; card: Card; number: string }
+  | { status: "replayed"; card: Card }
+  | { status: "conflict"; card: Card }
+
+const fingerprint = (input: IssueCardInput) =>
+  JSON.stringify([
+    input.nickname,
+    input.merchantId,
+    input.limit,
+    input.currency,
+    input.category,
+  ])
+
 /**
  * Issue a card. The full number is returned here and nowhere else: only the
- * last four is kept. A repeated idempotency key returns the card it already
- * made, with no number, so a double submit cannot issue or reveal twice.
+ * last four is kept. A repeated idempotency key with the same details replays
+ * the card without its number; with different details it is a conflict, so a
+ * retry after editing the limit cannot silently hand back the old card.
  */
 export function issueCard(
   input: IssueCardInput,
   idempotencyKey?: string,
-): { card: Card; number: string | null } {
-  const existingId = idempotencyKey
+): IssueResult {
+  const previous = idempotencyKey
     ? store.cardIdempotency.get(idempotencyKey)
     : undefined
-  const existing = existingId ? cardById(existingId) : null
-  if (existing) return { card: existing, number: null }
+  const existing = previous ? cardById(previous.cardId) : null
+  if (previous && existing) {
+    return previous.fingerprint === fingerprint(input)
+      ? { status: "replayed", card: existing }
+      : { status: "conflict", card: existing }
+  }
 
   const number = generateCardNumber()
   const now = new Date().toISOString()
@@ -49,8 +68,13 @@ export function issueCard(
   }
 
   store.cards.push(card)
-  if (idempotencyKey) store.cardIdempotency.set(idempotencyKey, card.id)
-  return { card, number }
+  if (idempotencyKey) {
+    store.cardIdempotency.set(idempotencyKey, {
+      cardId: card.id,
+      fingerprint: fingerprint(input),
+    })
+  }
+  return { status: "created", card, number }
 }
 
 export type StatusChange =

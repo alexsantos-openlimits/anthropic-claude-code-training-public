@@ -20,8 +20,8 @@ interface Store {
   disputes: Dispute[]
   payouts: Payout[]
   cards: Card[]
-  /** Idempotency-Key → card id, so a repeated issue request makes one card. */
-  cardIdempotency: Map<string, string>
+  /** Idempotency-Key → the card it made and the request it made it from. */
+  cardIdempotency: Map<string, { cardId: string; fingerprint: string }>
 }
 
 declare global {

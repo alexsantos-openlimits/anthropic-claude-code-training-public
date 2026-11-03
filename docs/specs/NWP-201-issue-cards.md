@@ -95,7 +95,8 @@ Add a `Card` record to the in-memory store. It holds `last4`, an opaque `panRefe
 
 ## Risks
 
-- **The full number leaking.** Number generation stays in the `POST` handler path only, the number is never stored, and there's a test that the stored card has no `number` field.
+- **The full number leaking.** Number generation stays in the `POST` handler path only, the number is never stored, and `src/data/cards.test.ts` checks that the stored card has no `number` field and doesn't contain the number anywhere.
+- **A retry after an edit bringing back the old card.** If the network drops after a card is created, ops might change the limit and resubmit from the same form. Reusing the idempotency key with different details returns 409 instead of the earlier card. *(Found in an independent review.)*
 - **Seed cards shifting payment data.** They're fixed literals added after `generate()` runs. I'll check that overview totals are unchanged.
 - **Freeze racing a cancel from another tab.** The server checks the transition against current state and returns 409. The UI shows the message and refreshes.
 

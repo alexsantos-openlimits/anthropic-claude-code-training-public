@@ -8,18 +8,22 @@ Northwind Payments is fictional. Every merchant, cardholder, amount, and card in
 
 ```bash
 npm install
-npm run dev
+npm run dev                                       # http://localhost:3000, redirects to /overview
+npm test                                          # Vitest, Node environment, src/**/*.test.ts only
+npx vitest run src/lib/csv.test.ts -t "quotes"    # one file, one test by name
+npm run lint
+npx tsc --noEmit                                  # type check; there is no script for it
 ```
 
-No database, no seed step, no Docker.
+No database, no seed step, no Docker. Run every command from this folder: the repository root has no `package.json`.
 
 ## Data lives in memory
 
-Seed data is JSON, loaded into a store module at boot. Route handlers read and write that store.
+Seed data is generated at boot by `src/data/generate.ts` from a fixed seed, so every machine sees identical records. The store in `src/data/store.ts` holds it on `globalThis`, so dev-server hot reloads do not reset it. Pages and route handlers read and write that store.
 
 - Writes last for the life of the dev server and vanish on restart. That is expected.
 - Persistence is tracked separately as NWP-203. **Do not add a database, an ORM, or migrations.**
-- If you need more seed data, add it to the JSON. Never edit seed data to make a failing case disappear.
+- If you need more seed data, change the generator. Never change it to make a failing case disappear.
 
 ## Where the rest of the context lives
 
@@ -56,6 +60,14 @@ These four explain most of the code, and breaking them is how bugs get in here.
 | `src/data/` | Seed JSON, the in-memory store, and types |
 | `src/components/` | Tremor-based primitives and the console's own components |
 | `src/lib/` | Money, date, and CSV helpers, each with a `.test.ts` beside it. Read these before touching an amount |
+
+`@/` maps to `src/`.
+
+## How requests flow
+
+- Pages are Server Components that call `src/data/queries.ts` directly; they do not fetch the API. The only HTTP routes are `GET /api/payments` (one page as JSON) and `GET /api/payments/export` (CSV).
+- `parseFilters` is where client input meets the allowlists. `queryPayments` filters, sorts, and paginates in one call.
+- The export calls `filterPayments` and `sortPayments` and skips pagination on purpose, so it covers every matching row, not the visible page.
 
 ## Before you push
 

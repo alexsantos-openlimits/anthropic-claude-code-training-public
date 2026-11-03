@@ -8,8 +8,15 @@ Northwind Payments is fictional. Every merchant, cardholder, amount, and card in
 
 ```bash
 npm install
-npm run dev
+npm run dev     # http://localhost:3000, redirects to /overview
+npm test        # vitest run (whole suite)
+npm run lint    # next lint
+npm run build   # next build
 ```
+
+Run one test file with `npx vitest run src/lib/money.test.ts`, or one test by name with `npx vitest run -t "<name>"`. `npm run test:watch` re-runs on change.
+
+Next.js 15 and React 19, so it needs Node 18.18 or later. Use npm: `package-lock.json` is the lockfile. From the repo root, the `merchant-console` entry in `.claude/launch.json` starts the dev server on port 3000.
 
 No database, no seed step, no Docker.
 

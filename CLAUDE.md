@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Claude Code Training — Repo Rescue
 
 Training repository for the Repo Rescue workshop. Learners take a ticket end to end against the Northwind Payments merchant console, then open a pull request here to be scored.
@@ -15,7 +19,7 @@ Read the narrowest one that applies before you write code.
 
 ## Repository layout
 
-- `docs/tickets/` — the tickets engineers work, written as they arrive on a sprint board
+- `docs/tickets/` — the tickets engineers work, written as they arrive on a sprint board. There are several (`NWP-101`, `NWP-102`, `NWP-201`, plus `BACKLOG.md`); `build-battle/CLAUDE.md` only walks through NWP-201, so check which ticket the branch name refers to
 - `docs/specs/` — where plans go before code does, and the template they follow
 - `docs/ORG-STANDARDS.md` — the org-wide engineering standards every service is measured against
 - `.claude/` — the skills (`/spec`, `/pr`, `/ship-ready`) and the `bug-investigator` subagent. Open Claude Code at this root and they are available everywhere
@@ -32,7 +36,7 @@ Read the narrowest one that applies before you write code.
 
 ## Submissions
 
-Work is submitted as a pull request against this repository and scored automatically.
+Work is submitted as a pull request and scored automatically. Nobody has push access to the workshop repository: `/submit` pushes the branch to your fork and opens the PR against `JJFromTenex/claude-code-training` (see `.claude/skills/submit/SKILL.md`). It needs `gh auth status` to show a logged-in account. Never submit from `main`.
 
 - Branch from `main` with the ticket ID: `NWP-201-issue-cards`
 - Commit subjects carry the ticket ID: `NWP-201: issue virtual cards`

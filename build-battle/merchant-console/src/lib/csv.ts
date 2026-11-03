@@ -5,9 +5,8 @@ import { formatMoney } from "./money"
 /**
  * CSV export for the payments table.
  *
- * The column set is fixed. Ops has asked for control over it — that is
- * NWP-101 — but today everyone gets every column, including the card
- * last four, whether or not the file is going to a merchant.
+ * Ops picks the columns. The card last four is off unless asked for, because
+ * these files go to merchants.
  */
 
 export const EXPORT_COLUMNS = [
@@ -24,6 +23,39 @@ export const EXPORT_COLUMNS = [
 ] as const
 
 export type ExportColumn = (typeof EXPORT_COLUMNS)[number]
+
+export const DEFAULT_EXPORT_COLUMNS: readonly ExportColumn[] =
+  EXPORT_COLUMNS.filter((column) => column !== "last4")
+
+export type ColumnsResult =
+  | { ok: true; columns: ExportColumn[] }
+  | { ok: false; error: string }
+
+/**
+ * Checks a comma-separated column list from the client against the allowlist.
+ * Keeps the requested order and drops repeats. A missing list means the
+ * defaults; an empty or unknown one is rejected rather than guessed at.
+ */
+export function parseExportColumns(raw: string | null): ColumnsResult {
+  if (raw === null) return { ok: true, columns: [...DEFAULT_EXPORT_COLUMNS] }
+
+  const requested = raw
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+  if (requested.length === 0) {
+    return { ok: false, error: "Select at least one column to export." }
+  }
+
+  const columns: ExportColumn[] = []
+  for (const name of requested) {
+    if (!EXPORT_COLUMNS.includes(name as ExportColumn)) {
+      return { ok: false, error: `Unknown column: ${name.slice(0, 40)}` }
+    }
+    if (!columns.includes(name as ExportColumn)) columns.push(name as ExportColumn)
+  }
+  return { ok: true, columns }
+}
 
 function escapeCell(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
@@ -66,6 +98,9 @@ export function toCsv(
   return [header, ...rows].join("\n")
 }
 
-export function exportFilename(date = new Date()): string {
-  return `payments-${date.toISOString().slice(0, 10)}.csv`
+/** `payments-<scope>-<UTC date>.csv`; the scope part is left out when there is none. */
+export function exportFilename(date = new Date(), scope?: string): string {
+  const label = scope?.replace(/[^a-z0-9-]/gi, "").toLowerCase()
+  const day = date.toISOString().slice(0, 10)
+  return label ? `payments-${label}-${day}.csv` : `payments-${day}.csv`
 }

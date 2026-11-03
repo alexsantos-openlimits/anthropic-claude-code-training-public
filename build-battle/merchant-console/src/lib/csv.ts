@@ -89,15 +89,50 @@ function cell(payment: Payment, column: ExportColumn): string {
   }
 }
 
+/**
+ * Project payments down to the chosen columns, once.
+ *
+ * Every serializer works from this, so CSV and JSON can never disagree about
+ * what a column holds.
+ */
+export function projectRows(
+  payments: Payment[],
+  columns: readonly ExportColumn[] = EXPORT_COLUMNS,
+): Record<ExportColumn, string>[] {
+  return payments.map((payment) => {
+    const row = {} as Record<ExportColumn, string>
+    for (const column of columns) row[column] = cell(payment, column)
+    return row
+  })
+}
+
 export function toCsv(
   payments: Payment[],
   columns: readonly ExportColumn[] = EXPORT_COLUMNS,
 ): string {
   const header = columns.join(",")
-  const rows = payments.map((payment) =>
-    columns.map((column) => escapeCell(cell(payment, column))).join(","),
+  const rows = projectRows(payments, columns).map((row) =>
+    columns.map((column) => escapeCell(row[column])).join(","),
   )
   return [header, ...rows].join("\n")
+}
+
+/** The same projection as the CSV, handed back as JSON for tools that want it. */
+export function toJson(
+  payments: Payment[],
+  columns: readonly ExportColumn[] = EXPORT_COLUMNS,
+): string {
+  return JSON.stringify(projectRows(payments, columns), null, 2)
+}
+
+export const EXPORT_FORMATS = ["csv", "json"] as const
+export type ExportFormat = (typeof EXPORT_FORMATS)[number]
+
+export function parseExportFormat(raw: string | null): ExportFormat | null {
+  if (raw === null) return "csv"
+  return (EXPORT_FORMATS as readonly string[]).includes(raw)
+    ? (raw as ExportFormat)
+    : null
 }
 
 /**
@@ -121,10 +156,14 @@ export function exportScopeToken(
  * Date is UTC, matching how payments are stored and bucketed. Two exports of
  * the same scope on the same day collide by design.
  */
-export function exportFilename(date = new Date(), scope?: string): string {
+export function exportFilename(
+  date = new Date(),
+  scope?: string,
+  format: ExportFormat = "csv",
+): string {
   const day = date.toISOString().slice(0, 10)
   const token = scope?.replace(/[^a-z0-9-]/gi, "").toLowerCase()
   return token
-    ? `payments-${token}-${day}.csv`
-    : `payments-${day}.csv`
+    ? `payments-${token}-${day}.${format}`
+    : `payments-${day}.${format}`
 }

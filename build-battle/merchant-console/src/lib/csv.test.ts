@@ -3,10 +3,14 @@ import { Payment } from "@/data/types"
 import {
   DEFAULT_EXPORT_COLUMNS,
   EXPORT_COLUMNS,
+  EXPORT_FORMATS,
   exportFilename,
   exportScopeToken,
   parseExportColumns,
+  parseExportFormat,
+  projectRows,
   toCsv,
+  toJson,
 } from "./csv"
 
 /**
@@ -167,6 +171,70 @@ describe("exportFilename", () => {
   it("strips anything that does not belong in a filename", () => {
     expect(exportFilename(new Date("2026-08-13T10:00:00.000Z"), "../etc")).toBe(
       "payments-etc-2026-08-13.csv",
+    )
+  })
+})
+
+describe("projectRows", () => {
+  it("keeps only the requested columns", () => {
+    expect(projectRows([payment], ["id", "amount"])).toEqual([
+      { id: "pay_0001", amount: "$250.00" },
+    ])
+  })
+
+  it("is the same projection the CSV is written from", () => {
+    const columns = ["merchant", "amount", "currency"] as const
+    const [row] = projectRows([payment], columns)
+    const body = toCsv([payment], columns).split("\n")[1]
+    expect(body).toBe(columns.map((c) => row[c]).join(","))
+  })
+})
+
+describe("toJson", () => {
+  it("writes one object per payment, with the requested columns", () => {
+    expect(JSON.parse(toJson([payment], ["id", "status"]))).toEqual([
+      { id: "pay_0001", status: "captured" },
+    ])
+  })
+
+  it("formats the amount once, exactly as the CSV does", () => {
+    const [row] = JSON.parse(toJson([payment], ["amount"]))
+    expect(row.amount).toBe("$250.00")
+  })
+
+  it("emits an empty array with no rows", () => {
+    expect(JSON.parse(toJson([], ["id"]))).toEqual([])
+  })
+})
+
+describe("parseExportFormat", () => {
+  it("defaults to csv when the client names no format", () => {
+    expect(parseExportFormat(null)).toBe("csv")
+  })
+
+  it("accepts every allowlisted format", () => {
+    for (const format of EXPORT_FORMATS) {
+      expect(parseExportFormat(format)).toBe(format)
+    }
+  })
+
+  it("rejects anything else rather than guessing", () => {
+    expect(parseExportFormat("xlsx")).toBeNull()
+    expect(parseExportFormat("")).toBeNull()
+    expect(parseExportFormat("../etc/passwd")).toBeNull()
+  })
+})
+
+describe("exportFilename with a format", () => {
+  it("carries the format as the extension", () => {
+    expect(
+      exportFilename(new Date("2026-08-13T10:00:00.000Z"), "disputed", "json"),
+    ).toBe("payments-disputed-2026-08-13.json")
+  })
+
+  it("still defaults to csv, so the original call keeps working", () => {
+    expect(exportFilename(new Date("2026-03-14T23:00:00.000Z"))).toBe(
+      "payments-2026-03-14.csv",
     )
   })
 })

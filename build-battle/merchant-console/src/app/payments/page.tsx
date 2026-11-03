@@ -11,6 +11,7 @@ import {
 import { StatusBadge } from "@/components/ui/payments/StatusBadge"
 import { merchantById, merchants } from "@/data/merchants"
 import { filterPayments, queryPayments } from "@/data/queries"
+import { exportScopeToken } from "@/lib/csv"
 import { PaymentFilters, PaymentStatus } from "@/data/types"
 import { formatDate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
@@ -71,6 +72,7 @@ export default async function PaymentsPage({
           query={query.toString()}
           filteredCount={total}
           allCount={allCount}
+          scopeToken={exportScopeToken(filters, "filter")}
         />
       </div>
 
@@ -107,21 +109,25 @@ export default async function PaymentsPage({
                   <TableCell>
                     <Link
                       href={`/payments/${payment.id}`}
-                      className="font-medium text-blue-600 hover:underline dark:text-blue-500"
+                      className="font-mono text-[13px] tracking-tight text-blue-600 hover:underline dark:text-blue-500"
                     >
                       {payment.id}
                     </Link>
                   </TableCell>
-                  <TableCell>{merchant?.name}</TableCell>
+                  <TableCell className="font-medium text-gray-900 dark:text-gray-50">
+                    {merchant?.name}
+                  </TableCell>
                   <TableCell className="text-gray-500">
                     {payment.description}
                   </TableCell>
-                  <TableCell className="capitalize">
+                  <TableCell className="capitalize tabular-nums">
                     {payment.method === "card"
                       ? `${payment.cardBrand} •••• ${payment.last4}`
                       : payment.method.replace("_", " ")}
                   </TableCell>
-                  <TableCell>{formatDate(payment.createdAt)}</TableCell>
+                  <TableCell className="tabular-nums text-gray-600 dark:text-gray-400">
+                    {formatDate(payment.createdAt)}
+                  </TableCell>
                   <TableCell className="text-right font-medium tabular-nums text-gray-900 dark:text-gray-50">
                     {formatMoney(payment.amount, payment.currency)}
                   </TableCell>
@@ -136,7 +142,7 @@ export default async function PaymentsPage({
       </TableRoot>
 
       <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm tabular-nums text-gray-500">
           {total.toLocaleString()} payments · page {page} of {pageCount}
         </p>
         <div className="flex gap-2">

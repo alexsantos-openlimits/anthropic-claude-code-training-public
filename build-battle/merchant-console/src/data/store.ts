@@ -1,6 +1,6 @@
 import { generate } from "./generate"
 import { merchants } from "./merchants"
-import { Dispute, Payment, Payout, Refund } from "./types"
+import { Card, Dispute, Payment, Payout, Refund } from "./types"
 
 /**
  * In-memory store.
@@ -19,6 +19,13 @@ interface Store {
   refunds: Refund[]
   disputes: Dispute[]
   payouts: Payout[]
+  /** Issued virtual cards. Empty at boot; NWP-201 fills it. */
+  cards: Card[]
+  /**
+   * Idempotency key to the card it issued. Held here, not in module scope,
+   * so it survives the dev server's module reloading exactly as the cards do.
+   */
+  issuedKeys: Record<string, string>
 }
 
 declare global {
@@ -28,7 +35,7 @@ declare global {
 
 function createStore(): Store {
   const { payments, refunds, disputes, payouts } = generate()
-  return { merchants, payments, refunds, disputes, payouts }
+  return { merchants, payments, refunds, disputes, payouts, cards: [], issuedKeys: {} }
 }
 
 export const store: Store = globalThis.__northwindStore ?? createStore()

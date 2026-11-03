@@ -48,6 +48,12 @@ const navigation = [
     icon: Banknote,
     notifications: false as const,
   },
+  {
+    name: "Cards",
+    href: siteConfig.baseLinks.cards,
+    icon: CreditCard,
+    notifications: false,
+  },
 ] as const
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

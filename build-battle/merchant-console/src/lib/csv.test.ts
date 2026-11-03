@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 import { Payment } from "@/data/types"
-import { EXPORT_COLUMNS, exportFilename, toCsv } from "./csv"
+import {
+  DEFAULT_EXPORT_COLUMNS,
+  EXPORT_COLUMNS,
+  exportFilename,
+  exportScopeLabel,
+  parseExportColumns,
+  parseExportScope,
+  toCsv,
+} from "./csv"
 
 /**
  * The export is the file ops hands to a merchant, so a broken cell is a
@@ -81,5 +89,67 @@ describe("exportFilename", () => {
     expect(exportFilename(new Date("2026-03-14T23:00:00.000Z"))).toBe(
       "payments-2026-03-14.csv",
     )
+  })
+
+  it("puts the scope before the date", () => {
+    expect(exportFilename(new Date("2026-08-13T12:00:00.000Z"), "disputed")).toBe(
+      "payments-disputed-2026-08-13.csv",
+    )
+  })
+})
+
+describe("column selection (NWP-101)", () => {
+  it("writes a subset of columns in the order requested, not the default order", () => {
+    const columns = parseExportColumns("amount,status,id")
+    expect(columns).toEqual(["amount", "status", "id"])
+    expect(toCsv([payment], columns!)).toBe(
+      ["amount,status,id", "$250.00,captured,pay_0001"].join("\n"),
+    )
+  })
+
+  it("leaves the card last four out by default", () => {
+    const columns = parseExportColumns(null)
+    expect(columns).toEqual([...DEFAULT_EXPORT_COLUMNS])
+    expect(columns).not.toContain("last4")
+
+    const [header, row] = toCsv([payment], columns!).split("\n")
+    expect(header.split(",")).not.toContain("last4")
+    expect(row).not.toContain("4242")
+  })
+
+  it("includes last four only when it is asked for", () => {
+    expect(toCsv([payment], parseExportColumns("id,last4")!)).toBe(
+      ["id,last4", "pay_0001,4242"].join("\n"),
+    )
+  })
+
+  it("treats an empty selection as no columns, so the route can refuse it", () => {
+    expect(parseExportColumns("")).toEqual([])
+    expect(parseExportColumns("  ")).toEqual([])
+  })
+
+  it("rejects the whole request when any column is not on the allowlist", () => {
+    expect(parseExportColumns("id,card_number")).toBeNull()
+    expect(parseExportColumns("amount,1;drop table payments")).toBeNull()
+    expect(parseExportColumns("id,")).toBeNull()
+  })
+
+  it("drops repeated columns but keeps first-seen order", () => {
+    expect(parseExportColumns("id, amount ,id")).toEqual(["id", "amount"])
+  })
+})
+
+describe("export scope", () => {
+  it("defaults to the current filter unless 'all' is asked for exactly", () => {
+    expect(parseExportScope(null)).toBe("current")
+    expect(parseExportScope("ALL")).toBe("current")
+    expect(parseExportScope("all")).toBe("all")
+  })
+
+  it("labels the file from validated filters only", () => {
+    expect(exportScopeLabel("all", { status: "disputed" })).toBe("all")
+    expect(exportScopeLabel("current", { status: "disputed" })).toBe("disputed")
+    expect(exportScopeLabel("current", { status: "all", search: "x" })).toBe("filtered")
+    expect(exportScopeLabel("current", { status: "all" })).toBe("all")
   })
 })

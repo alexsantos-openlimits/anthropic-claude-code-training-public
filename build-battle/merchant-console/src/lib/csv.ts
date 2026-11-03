@@ -1,13 +1,13 @@
 import { merchantById } from "@/data/merchants"
-import { Payment } from "@/data/types"
+import { Payment, PaymentFilters } from "@/data/types"
 import { formatMoney } from "./money"
 
 /**
  * CSV export for the payments table.
  *
- * The column set is fixed. Ops has asked for control over it — that is
- * NWP-101 — but today everyone gets every column, including the card
- * last four, whether or not the file is going to a merchant.
+ * Ops chooses the columns and the scope (NWP-101). Column names arrive from
+ * the client, so they are checked against EXPORT_COLUMNS before they reach
+ * the serializer, and the card last four is left out unless asked for.
  */
 
 export const EXPORT_COLUMNS = [
@@ -24,6 +24,55 @@ export const EXPORT_COLUMNS = [
 ] as const
 
 export type ExportColumn = (typeof EXPORT_COLUMNS)[number]
+
+/** What a file gets when nobody chose: everything except the card last four. */
+export const DEFAULT_EXPORT_COLUMNS: readonly ExportColumn[] =
+  EXPORT_COLUMNS.filter((column) => column !== "last4")
+
+/**
+ * Validate a `columns` param such as "amount,id".
+ *
+ * Missing means the defaults. An empty string means nothing was selected and
+ * comes back as []. Any name outside EXPORT_COLUMNS makes the whole request
+ * invalid (null) rather than being dropped silently. Order is kept; repeats
+ * are removed.
+ */
+export function parseExportColumns(raw: string | null): ExportColumn[] | null {
+  if (raw === null) return [...DEFAULT_EXPORT_COLUMNS]
+  if (raw.trim() === "") return []
+
+  const columns: ExportColumn[] = []
+  for (const name of raw.split(",").map((part) => part.trim())) {
+    if (!EXPORT_COLUMNS.includes(name as ExportColumn)) return null
+    if (!columns.includes(name as ExportColumn)) {
+      columns.push(name as ExportColumn)
+    }
+  }
+  return columns
+}
+
+export type ExportScope = "current" | "all"
+
+/** Current filter unless the client asked for exactly "all". */
+export function parseExportScope(raw: string | null): ExportScope {
+  return raw === "all" ? "all" : "current"
+}
+
+/**
+ * The scope part of the filename. Built only from validated values, never
+ * from raw input, because it ends up in a response header.
+ */
+export function exportScopeLabel(
+  scope: ExportScope,
+  filters: PaymentFilters,
+): string {
+  if (scope === "all") return "all"
+  if (filters.status && filters.status !== "all") return filters.status
+  if (filters.merchantId || filters.search || filters.from || filters.to) {
+    return "filtered"
+  }
+  return "all"
+}
 
 function escapeCell(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
@@ -66,6 +115,7 @@ export function toCsv(
   return [header, ...rows].join("\n")
 }
 
-export function exportFilename(date = new Date()): string {
-  return `payments-${date.toISOString().slice(0, 10)}.csv`
+export function exportFilename(date = new Date(), scopeLabel?: string): string {
+  const day = date.toISOString().slice(0, 10)
+  return scopeLabel ? `payments-${scopeLabel}-${day}.csv` : `payments-${day}.csv`
 }

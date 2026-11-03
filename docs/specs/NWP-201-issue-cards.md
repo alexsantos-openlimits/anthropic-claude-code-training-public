@@ -57,7 +57,7 @@ How the card number is handled:
 - The issue form shows the number on a success view inside the Drawer and clears it from state when the Drawer closes.
 
 How spend, status and history are handled:
-- Spend is a field on the card (`spent` in minor units, 0 at issue).
+- Spend is never stored. It is the sum of the card's charges (`cardSpend`, using `sumMinorUnits`), so a new card is at 0 and seeded cards carry the charges that make up their spend.
 - A status-history array (UTC timestamp and transition) is kept on the card. It answers "what happened to this card last Tuesday".
 - Freeze and unfreeze call `POST /api/cards/[id]/status`, then refresh the route, with no full page reload.
 
@@ -74,7 +74,7 @@ How spend, status and history are handled:
 | `src/lib/cards.test.ts` | add | Luhn, BIN prefix, transitions, validation edges |
 | `src/data/cards.ts` | add | `issueCard`, `listCards`, `cardById`, `transitionCard` against the store |
 | `src/data/store.ts` | change | Add `cards` and the idempotency map (`cardRequests`) to `Store` |
-| `src/data/generate.ts` | change | `generateCards()`: 5 deterministic demo cards (Decision 1), numbers from the same 4242 generator |
+| `src/data/generate.ts` | change | `generateCards()`: 5 deterministic demo cards with categories and charges (Decision 1), numbers from the same 4242 generator |
 | `src/lib/api-error.ts` | add | The one error shape for route handlers: `{ error: { message, field? } }` |
 | `src/app/api/cards/route.ts` | add | `GET` masked list; `POST` issue, the only response with the full number |
 | `src/app/api/cards/[id]/route.ts` | add | `GET` masked detail, 404 on unknown |
@@ -82,7 +82,7 @@ How spend, status and history are handled:
 | `src/app/cards/page.tsx` | add | List: nickname, merchant, masked number, limit, status, created date, plus the empty state |
 | `src/app/cards/issue-card-drawer.tsx` | add | Client form in `Drawer`; labeled inputs; field errors from the API; one-time reveal view |
 | `src/app/cards/[id]/page.tsx` | add | Detail: full record, spend vs limit bar (amber > 80%), status history in merchant timezone |
-| `src/app/cards/card-status-actions.tsx` | add | Freeze/unfreeze/cancel buttons; cancel asks for confirmation |
+| `src/app/cards/card-status-actions.tsx` | add | One status hook shared by the list-row freeze/unfreeze toggle and the detail page's freeze/unfreeze/cancel (cancel asks for confirmation) |
 | `src/components/ui/payments/StatusBadge.tsx` | change | Add `active`, `frozen`, `cancelled` labels and dots |
 | `src/app/siteConfig.ts`, `src/components/ui/navigation/AppSidebar.tsx`, `Breadcrumbs.tsx` | change | Cards nav entry and breadcrumb label |
 | `src/components/ui/DetailField.tsx` | add | The detail-grid field, moved out of `src/app/payments/[id]/page.tsx` so both detail pages share one |
@@ -119,7 +119,7 @@ How spend, status and history are handled:
 ## Out of scope
 
 - Persistence (NWP-203), auth/roles, real card-network calls, and editing a limit after issue (NWP-202), all per the ticket.
-- Merchant category lock, unless time remains after step 7.
+- Enforcing the category lock against real transactions: there is no card network here, so the lock is chosen, validated, stored, and shown.
 
 ## Decisions (answered by Patrick, 2026-11-03)
 
@@ -128,3 +128,10 @@ How spend, status and history are handled:
 3. **Duplicate submits.** The form sends an idempotency key. The server returns the original card for a repeated key and never issues a second one.
 4. **Cancel in the UI.** Exposed behind a confirm. A cancelled card shows no actions.
 5. **Nickname.** Required, trimmed, 1–60 characters.
+
+## Changes after the first review (2026-11-03)
+
+- **Decision 1 revised.** Seeded spend is the sum of seeded charges, not a hardcoded total. The detail page lists the charges.
+- **Decision 2 revised.** The server rejects a card currency that differs from the merchant's (`validateIssueInput`). The form still defaults to it.
+- **Freeze and unfreeze from the list.** Each list row has a freeze/unfreeze toggle, as the ticket asks, as well as the detail page.
+- **Merchant category lock built.** The category is chosen at issue from an allowlist (`CARD_CATEGORIES`), validated on the server, and shown in the list and on the detail page.

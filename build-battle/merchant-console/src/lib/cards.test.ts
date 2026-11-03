@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   canTransition,
   CARD_STATUSES,
+  cardSpend,
   generateCardNumber,
   isValidLuhn,
   luhnCheckDigit,
@@ -46,6 +47,21 @@ describe("generateCardNumber", () => {
   })
 })
 
+describe("cardSpend", () => {
+  it("sums the card's charges in minor units", () => {
+    const at = "2026-08-01T00:00:00.000Z"
+    expect(cardSpend({ charges: [] })).toBe(0)
+    expect(
+      cardSpend({
+        charges: [
+          { description: "a", amount: 14900, at },
+          { description: "b", amount: 15000, at },
+        ],
+      }),
+    ).toBe(29900)
+  })
+})
+
 describe("maskCardNumber", () => {
   it("shows the last four only", () => {
     expect(maskCardNumber("4242")).toBe("•••• 4242")
@@ -81,6 +97,7 @@ describe("validateIssueInput", () => {
     merchantId: "mch_01",
     spendLimit: 25000,
     currency: "USD",
+    category: "advertising",
   }
 
   it("accepts a valid request and trims the nickname", () => {
@@ -114,6 +131,17 @@ describe("validateIssueInput", () => {
   it("rejects a currency outside USD, EUR, GBP", () => {
     expect(fieldFor({ ...valid, currency: "JPY" })).toBe("currency")
     expect(fieldFor({ ...valid, currency: "usd" })).toBe("currency")
+  })
+
+  it("rejects a currency that differs from the merchant's", () => {
+    expect(fieldFor({ ...valid, currency: "EUR" })).toBe("currency")
+    expect(fieldFor({ ...valid, merchantId: "mch_05", currency: "EUR" })).toBeNull()
+  })
+
+  it("rejects a missing or unknown category", () => {
+    expect(fieldFor({ ...valid, category: undefined })).toBe("category")
+    expect(fieldFor({ ...valid, category: "gambling" })).toBe("category")
+    expect(fieldFor({ ...valid, category: "toString" })).toBe("category")
   })
 
   it("rejects a blank or over-long nickname", () => {

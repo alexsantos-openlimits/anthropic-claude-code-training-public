@@ -86,6 +86,23 @@ export interface PaymentFilters {
 
 export type CardStatus = "active" | "frozen" | "cancelled"
 
+/** The merchant category a card is locked to at issue. */
+export type CardCategory =
+  | "advertising"
+  | "software"
+  | "travel"
+  | "office_supplies"
+  | "contractors"
+
+/** A charge on a card. Spend is the sum of these, never a stored total. */
+export interface CardCharge {
+  description: string
+  /** Integer minor units, in the card's currency. */
+  amount: number
+  /** ISO 8601, always UTC. */
+  at: string
+}
+
 /** One entry in a card's status history. `from` is null for issue. */
 export interface CardEvent {
   from: CardStatus | null
@@ -105,13 +122,13 @@ export interface Card {
   last4: string
   /** Integer minor units. */
   spendLimit: number
-  /** Integer minor units. */
-  spent: number
   currency: Currency
+  category: CardCategory
   status: CardStatus
   /** ISO 8601, always UTC. */
   createdAt: string
   history: CardEvent[]
+  charges: CardCharge[]
 }
 
 export interface IssueCardInput {
@@ -120,5 +137,6 @@ export interface IssueCardInput {
   /** Integer minor units. */
   spendLimit: number
   currency: Currency
+  category: CardCategory
   idempotencyKey?: string
 }

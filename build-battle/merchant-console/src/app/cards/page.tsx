@@ -10,10 +10,11 @@ import {
 import { StatusBadge } from "@/components/ui/payments/StatusBadge"
 import { listCards } from "@/data/cards"
 import { merchantById, merchants } from "@/data/merchants"
-import { maskCardNumber } from "@/lib/cards"
+import { CARD_CATEGORIES, maskCardNumber } from "@/lib/cards"
 import { formatDate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
 import Link from "next/link"
+import { CardFreezeToggle } from "./card-status-actions"
 import { IssueCardDrawer } from "./issue-card-drawer"
 
 // Cards change at runtime; never serve a list rendered at build time.
@@ -49,15 +50,19 @@ export default function CardsPage() {
               <TableHeaderCell>Nickname</TableHeaderCell>
               <TableHeaderCell>Merchant</TableHeaderCell>
               <TableHeaderCell>Card</TableHeaderCell>
+              <TableHeaderCell>Category</TableHeaderCell>
               <TableHeaderCell className="text-right">Spend limit</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
               <TableHeaderCell>Created</TableHeaderCell>
+              <TableHeaderCell>
+                <span className="sr-only">Actions</span>
+              </TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {cards.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-16 text-center">
+                <TableCell colSpan={8} className="py-16 text-center">
                   <p className="font-medium text-gray-900 dark:text-gray-50">
                     No cards issued yet
                   </p>
@@ -81,6 +86,7 @@ export default function CardsPage() {
                 <TableCell className="font-mono tabular-nums">
                   {maskCardNumber(card.last4)}
                 </TableCell>
+                <TableCell>{CARD_CATEGORIES[card.category]}</TableCell>
                 <TableCell className="text-right font-medium tabular-nums text-gray-900 dark:text-gray-50">
                   {formatMoney(card.spendLimit, card.currency)}
                 </TableCell>
@@ -88,6 +94,13 @@ export default function CardsPage() {
                   <StatusBadge status={card.status} />
                 </TableCell>
                 <TableCell>{formatDate(card.createdAt)}</TableCell>
+                <TableCell className="text-right">
+                  <CardFreezeToggle
+                    cardId={card.id}
+                    nickname={card.nickname}
+                    status={card.status}
+                  />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -1,6 +1,13 @@
 import { merchantById } from "@/data/merchants"
-import { CardStatus, CURRENCIES, Currency, IssueCardInput } from "@/data/types"
-import { formatMoney } from "./money"
+import {
+  Card,
+  CardCategory,
+  CardStatus,
+  CURRENCIES,
+  Currency,
+  IssueCardInput,
+} from "@/data/types"
+import { formatMoney, sumMinorUnits } from "./money"
 
 /**
  * Card rules. Every generated number is on the 4242 test BIN with a valid
@@ -47,6 +54,23 @@ export function maskCardNumber(last4: string): string {
   return `•••• ${last4}`
 }
 
+/** Spend is derived from the card's charges, all in the card's currency. */
+export function cardSpend(card: Pick<Card, "charges">): number {
+  return sumMinorUnits(card.charges.map((charge) => charge.amount))
+}
+
+export const CARD_CATEGORIES: Record<CardCategory, string> = {
+  advertising: "Advertising",
+  software: "Software and SaaS",
+  travel: "Travel",
+  office_supplies: "Office supplies",
+  contractors: "Contractor services",
+}
+
+function isCardCategory(value: unknown): value is CardCategory {
+  return typeof value === "string" && Object.hasOwn(CARD_CATEGORIES, value)
+}
+
 /** `active ⇄ frozen`, either to `cancelled`, and `cancelled` is terminal. */
 const TRANSITIONS: Record<CardStatus, readonly CardStatus[]> = {
   active: ["frozen", "cancelled"],
@@ -86,7 +110,8 @@ export function validateIssueInput(body: unknown): ValidationResult {
   }
 
   const merchantId = typeof input.merchantId === "string" ? input.merchantId : ""
-  if (!merchantById(merchantId)) {
+  const merchant = merchantById(merchantId)
+  if (!merchant) {
     return { ok: false, field: "merchantId", message: "Choose a merchant." }
   }
 
@@ -99,6 +124,13 @@ export function validateIssueInput(body: unknown): ValidationResult {
   }
 
   const currency = input.currency as Currency
+  if (currency !== merchant.currency) {
+    return {
+      ok: false,
+      field: "currency",
+      message: `${merchant.name} settles in ${merchant.currency}. The card must use the same currency.`,
+    }
+  }
 
   const spendLimit = input.spendLimit
   if (
@@ -114,6 +146,10 @@ export function validateIssueInput(body: unknown): ValidationResult {
     }
   }
 
+  if (!isCardCategory(input.category)) {
+    return { ok: false, field: "category", message: "Choose a merchant category." }
+  }
+
   const key = input.idempotencyKey
   if (key !== undefined && (typeof key !== "string" || key.length === 0 || key.length > 100)) {
     return { ok: false, field: "idempotencyKey", message: "Invalid request key." }
@@ -126,6 +162,7 @@ export function validateIssueInput(body: unknown): ValidationResult {
       merchantId,
       spendLimit,
       currency,
+      category: input.category,
       idempotencyKey: key,
     },
   }

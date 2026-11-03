@@ -36,7 +36,7 @@ export function issueCard(
     ...details,
     id: `crd_${String(store.cards.length + 1).padStart(4, "0")}`,
     last4: number.slice(-4),
-    spent: 0,
+    charges: [],
     status: "active",
     createdAt,
     history: [{ from: null, to: "active", at: createdAt }],

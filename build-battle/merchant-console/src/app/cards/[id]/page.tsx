@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/ui/payments/StatusBadge"
 import { cardById } from "@/data/cards"
 import { merchantById } from "@/data/merchants"
 import { CardEvent } from "@/data/types"
-import { maskCardNumber } from "@/lib/cards"
+import { CARD_CATEGORIES, cardSpend, maskCardNumber } from "@/lib/cards"
 import { formatInZone } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
 import { cx } from "@/lib/utils"
@@ -29,10 +29,11 @@ export default async function CardDetail({
   if (!card) notFound()
 
   const merchant = merchantById(card.merchantId)!
-  const remaining = Math.max(0, card.spendLimit - card.spent)
+  const spent = cardSpend(card)
+  const remaining = Math.max(0, card.spendLimit - spent)
   // Integer comparison: past 80% when spent / limit > 4 / 5.
-  const nearLimit = card.spent * 5 > card.spendLimit * 4
-  const percent = Math.floor((card.spent * 100) / card.spendLimit)
+  const nearLimit = spent * 5 > card.spendLimit * 4
+  const percent = Math.floor((spent * 100) / card.spendLimit)
 
   return (
     <div className="p-4 sm:p-6">
@@ -63,14 +64,14 @@ export default async function CardDetail({
         Spend
       </h2>
       <p className="mt-2 text-sm tabular-nums text-gray-900 dark:text-gray-50">
-        {formatMoney(card.spent, card.currency)} of{" "}
+        {formatMoney(spent, card.currency)} of{" "}
         {formatMoney(card.spendLimit, card.currency)}
         <span className="ml-2 text-gray-500">
           {percent}% used · {formatMoney(remaining, card.currency)} left
         </span>
       </p>
       <progress
-        value={card.spent}
+        value={spent}
         max={card.spendLimit}
         aria-label={`Spend against limit, ${percent}% used`}
         className={cx(
@@ -104,6 +105,7 @@ export default async function CardDetail({
           <span className="ml-2 text-gray-500">{card.currency}</span>
         </Field>
         <Field label="Card">{maskCardNumber(card.last4)}</Field>
+        <Field label="Locked to category">{CARD_CATEGORIES[card.category]}</Field>
         <Field label="Created (UTC)">
           <span className="font-mono text-sm">{card.createdAt}</span>
         </Field>
@@ -111,6 +113,31 @@ export default async function CardDetail({
           {formatInZone(card.createdAt, merchant.timezone)}
         </Field>
       </dl>
+
+      <Divider />
+
+      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+        Charges
+      </h2>
+      {card.charges.length === 0 ? (
+        <p className="mt-2 text-sm text-gray-500">No charges on this card yet.</p>
+      ) : (
+        <ul className="mt-2 max-w-md divide-y divide-gray-200 text-sm dark:divide-gray-800">
+          {[...card.charges].reverse().map((charge) => (
+            <li key={charge.at} className="flex justify-between gap-4 py-2">
+              <span>
+                <span className="text-gray-900 dark:text-gray-50">{charge.description}</span>
+                <span className="ml-2 text-gray-500">
+                  {formatInZone(charge.at, merchant.timezone)}
+                </span>
+              </span>
+              <span className="tabular-nums text-gray-900 dark:text-gray-50">
+                {formatMoney(charge.amount, card.currency)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Divider />
 

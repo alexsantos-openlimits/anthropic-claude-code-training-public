@@ -20,18 +20,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/Select"
-import { Card, CURRENCIES, Currency } from "@/data/types"
-import { maskCardNumber, NICKNAME_MAX_LENGTH } from "@/lib/cards"
+import { Card, CardCategory, CURRENCIES, Currency } from "@/data/types"
+import { CARD_CATEGORIES, maskCardNumber, NICKNAME_MAX_LENGTH } from "@/lib/cards"
 import { formatMoney, parseAmountToMinorUnits } from "@/lib/money"
 import { Plus } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { FormEvent, useRef, useState } from "react"
 
-type Field = "nickname" | "merchantId" | "spendLimit" | "currency"
+type Field = "nickname" | "merchantId" | "spendLimit" | "currency" | "category"
 type Errors = Partial<Record<Field, string>>
 
-const FIELDS: readonly string[] = ["nickname", "merchantId", "spendLimit", "currency"]
+const FIELDS: readonly string[] = [
+  "nickname",
+  "merchantId",
+  "spendLimit",
+  "currency",
+  "category",
+]
 
 const labelClass = "text-sm font-medium text-gray-900 dark:text-gray-50"
 const errorClass = "mt-1 text-sm text-red-600 dark:text-red-500"
@@ -47,6 +53,7 @@ export function IssueCardDrawer({
   const [merchantId, setMerchantId] = useState("")
   const [currency, setCurrency] = useState<Currency | "">("")
   const [limit, setLimit] = useState("")
+  const [category, setCategory] = useState<CardCategory | "">("")
   const [errors, setErrors] = useState<Errors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -66,6 +73,7 @@ export function IssueCardDrawer({
     setMerchantId("")
     setCurrency("")
     setLimit("")
+    setCategory("")
     setErrors({})
     setFormError(null)
     setIssued(null)
@@ -93,6 +101,7 @@ export function IssueCardDrawer({
           merchantId,
           spendLimit,
           currency,
+          category,
           idempotencyKey: requestKey.current,
         }),
       })
@@ -284,13 +293,39 @@ export function IssueCardDrawer({
                   {errors.currency}
                 </p>
               )}
-              {merchantId && currency && (
-                <p className="text-sm text-gray-500">
-                  {currency === merchants.find((m) => m.id === merchantId)?.currency
-                    ? "Defaulted to the merchant's currency."
-                    : "This currency differs from the merchant's own. Check before issuing."}
+
+              <div>
+                <label htmlFor="issue-category" className={labelClass}>
+                  Merchant category
+                </label>
+                <Select
+                  value={category}
+                  onValueChange={(value) => setCategory(value as CardCategory)}
+                >
+                  <SelectTrigger
+                    id="issue-category"
+                    className="mt-2"
+                    hasError={Boolean(errors.category)}
+                    aria-invalid={Boolean(errors.category)}
+                    aria-describedby={describedBy("category")}
+                  >
+                    <SelectValue placeholder="Choose a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CARD_CATEGORIES).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p
+                  id="issue-category-error"
+                  className={errors.category ? errorClass : "mt-1 text-sm text-gray-500"}
+                >
+                  {errors.category ?? "The card only works at merchants in this category."}
                 </p>
-              )}
+              </div>
 
               {formError && (
                 <p role="alert" className="text-sm text-red-600 dark:text-red-500">

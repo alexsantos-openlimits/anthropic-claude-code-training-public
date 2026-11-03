@@ -18,6 +18,7 @@ import {
   EXPORT_FORMATS,
   ExportColumn,
   ExportFormat,
+  exportFilename,
 } from "@/lib/csv"
 import { cx, focusRing } from "@/lib/utils"
 import { Check, Copy, Download } from "lucide-react"
@@ -48,10 +49,6 @@ const CONTROL = cx(
   focusRing,
 )
 
-function todayUtc() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 export function ExportOptionsDialog({
   query,
   filteredCount,
@@ -69,6 +66,7 @@ export function ExportOptionsDialog({
   const [scope, setScope] = useState<ExportScope>("filter")
   const [format, setFormat] = useState<ExportFormat>("csv")
   const [preview, setPreview] = useState("")
+  const [previewFailed, setPreviewFailed] = useState(false)
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -119,22 +117,37 @@ export function ExportOptionsDialog({
     return `/api/payments/export?${params.toString()}`
   }, [query, scope, selected, format])
 
-  const filename = `payments-${scope === "all" ? "all" : scopeToken}-${todayUtc()}.${format}`
+  // The same builder the route uses, so the name shown is the name saved.
+  const filename = exportFilename(
+    new Date(),
+    scope === "all" ? "all" : scopeToken,
+    format,
+  )
 
   // The preview is the first lines of the real file, fetched from the real
   // route, so it can never drift from what downloads.
   useEffect(() => {
     if (nothingSelected) {
       setPreview("")
+      setPreviewFailed(false)
       return
     }
     const controller = new AbortController()
     const timer = setTimeout(() => {
       fetch(`${href}&preview=1`, { signal: controller.signal })
-        .then((res) => (res.ok ? res.text() : ""))
-        .then(setPreview)
-        .catch(() => {
-          /* aborted or offline: the preview just stays as it was */
+        .then((res) => {
+          if (!res.ok) throw new Error(String(res.status))
+          return res.text()
+        })
+        .then((text) => {
+          setPreview(text)
+          setPreviewFailed(false)
+        })
+        .catch((error) => {
+          // An abort is this effect superseding itself, not a failure.
+          if (error?.name === "AbortError") return
+          setPreview("")
+          setPreviewFailed(true)
         })
     }, 120)
     return () => {
@@ -252,10 +265,10 @@ export function ExportOptionsDialog({
           </fieldset>
 
           <fieldset>
-            <div className="flex items-baseline justify-between gap-4">
-              <legend className="text-sm font-medium text-gray-900 dark:text-gray-50">
-                Columns
-              </legend>
+            <legend className="text-sm font-medium text-gray-900 dark:text-gray-50">
+              Columns
+            </legend>
+            <div className="-mt-6 flex justify-end">
               <div className="flex gap-3 text-xs">
                 <button
                   type="button"
@@ -327,9 +340,16 @@ export function ExportOptionsDialog({
               <p className="mt-1 text-xs text-gray-500">
                 The first rows of the file itself, straight from the export.
               </p>
-              <pre className="mt-2.5 max-h-40 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700 dark:border-gray-800 dark:bg-gray-900/50 dark:text-gray-300">
-                {preview || "Loading the first rows…"}
-              </pre>
+              {previewFailed ? (
+                <p className="mt-2.5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+                  The preview could not be loaded. The download may fail too —
+                  check the column selection and try again.
+                </p>
+              ) : (
+                <pre className="mt-2.5 max-h-40 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700 dark:border-gray-800 dark:bg-gray-900/50 dark:text-gray-300">
+                  {preview || "Loading the first rows…"}
+                </pre>
+              )}
             </div>
           )}
         </DrawerBody>

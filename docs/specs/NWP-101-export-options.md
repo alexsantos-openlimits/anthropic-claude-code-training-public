@@ -135,8 +135,11 @@ one more `filterPayments` call in the server component.
 
 ## Out of scope
 
-- Reordering columns, or saving a column preset per user. Not asked for; no persistence exists
-  (`merchant-console/CLAUDE.md`: persistence is NWP-203).
+- Reordering columns. Not asked for.
+- Saving a column preset per user. **Revised after the first build:** ops asked for the
+  choice to stick, so the dialog remembers the column set and format in `sessionStorage`
+  for the browser session only. That is a UI convenience, not the persistence NWP-203
+  covers: nothing reaches the store, and a blocked store falls back to the defaults.
 - Formats other than CSV.
 - Fixing the amount sort bug — NWP-102.
 - Date-range filters in the dialog. `parseFilters` reads `from`/`to` but `filter-bar.tsx` never

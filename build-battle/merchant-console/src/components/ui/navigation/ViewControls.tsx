@@ -14,6 +14,12 @@ import { useEffect, useState } from "react"
  */
 
 const SCALES = [87.5, 100, 112.5, 125] as const
+const SCALE_CLASSES = [
+  "text-scale-88",
+  "text-scale-100",
+  "text-scale-112",
+  "text-scale-125",
+] as const
 const DEFAULT_SCALE = 1
 const STORAGE_KEY = "nwp-text-scale"
 
@@ -44,8 +50,9 @@ export function ViewControls() {
   useEffect(() => {
     if (!mounted) return
     const percent = SCALES[scale]
-    document.documentElement.style.fontSize =
-      percent === 100 ? "" : `${percent}%`
+    const root = document.documentElement
+    root.classList.remove(...SCALE_CLASSES)
+    if (percent !== 100) root.classList.add(SCALE_CLASSES[scale])
     try {
       localStorage.setItem(STORAGE_KEY, String(percent))
     } catch {

@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Text scale, driven by ViewControls. Every measurement in the app is in rem,
+   so moving the root size moves the table, its header and the controls together.
+   Kept here rather than as an inline style, per .claude/rules/components.md. */
+html.text-scale-88 { font-size: 87.5%; }
+html.text-scale-100 { font-size: 100%; }
+html.text-scale-112 { font-size: 112.5%; }
+html.text-scale-125 { font-size: 125%; }

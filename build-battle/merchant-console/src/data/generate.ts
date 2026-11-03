@@ -1,5 +1,9 @@
-import { merchants } from "./merchants"
+import { generateCardNumber } from "@/lib/cards"
+import { merchantById, merchants } from "./merchants"
 import {
+  Card,
+  CardCategory,
+  CardEvent,
   Currency,
   Dispute,
   Payment,
@@ -190,4 +194,110 @@ function generatePayouts(payments: Payment[]): Payout[] {
   }
 
   return payouts
+}
+
+const daysBefore = (days: number) =>
+  new Date(GENERATED_AT.getTime() - days * 86_400_000).toISOString()
+
+/**
+ * Demo cards, so the list and the spend bar have something real on first
+ * load. Each card's spend is the sum of its seeded charges; numbers come from
+ * the same 4242 generator the issue route uses.
+ */
+export function generateCards(): Card[] {
+  type Charge = [description: string, amount: number, daysAgo: number]
+  const seeds: {
+    nickname: string
+    merchantId: string
+    category: CardCategory
+    spendLimit: number
+    issuedDaysAgo: number
+    charges: Charge[]
+    history?: Omit<CardEvent, "at"> & { daysAgo: number }
+  }[] = [
+    {
+      nickname: "Google Ads, always on",
+      merchantId: "mch_01",
+      category: "advertising",
+      spendLimit: 500000,
+      issuedDaysAgo: 40,
+      charges: [
+        ["Search campaign", 150000, 35],
+        ["Search campaign", 150000, 21],
+        ["Holiday preview ads", 112500, 4],
+      ],
+    },
+    {
+      nickname: "Design tool seats",
+      merchantId: "mch_04",
+      category: "software",
+      spendLimit: 120000,
+      issuedDaysAgo: 25,
+      charges: [
+        ["Monthly seats", 18000, 24],
+        ["Monthly seats", 18000, 1],
+      ],
+    },
+    {
+      nickname: "Contractor tools",
+      merchantId: "mch_05",
+      category: "contractors",
+      spendLimit: 250000,
+      issuedDaysAgo: 60,
+      charges: [],
+      history: { from: "active", to: "frozen", daysAgo: 6 },
+    },
+    {
+      nickname: "Trade show deposit",
+      merchantId: "mch_07",
+      category: "travel",
+      spendLimit: 1000000,
+      issuedDaysAgo: 75,
+      charges: [
+        ["Booth deposit", 400000, 70],
+        ["Hotel block", 240000, 45],
+      ],
+      history: { from: "active", to: "cancelled", daysAgo: 20 },
+    },
+    {
+      nickname: "Storefront apps",
+      merchantId: "mch_10",
+      category: "software",
+      spendLimit: 30000,
+      issuedDaysAgo: 10,
+      charges: [
+        ["Reviews app", 14900, 9],
+        ["Shipping labels app", 15000, 2],
+      ],
+    },
+  ]
+
+  return seeds.map((seed, index) => {
+    const createdAt = daysBefore(seed.issuedDaysAgo)
+    const history: CardEvent[] = [{ from: null, to: "active", at: createdAt }]
+    if (seed.history) {
+      history.push({
+        from: seed.history.from,
+        to: seed.history.to,
+        at: daysBefore(seed.history.daysAgo),
+      })
+    }
+    return {
+      id: `crd_${pad(index + 1, 4)}`,
+      nickname: seed.nickname,
+      merchantId: seed.merchantId,
+      last4: generateCardNumber(rand).slice(-4),
+      spendLimit: seed.spendLimit,
+      currency: merchantById(seed.merchantId)!.currency,
+      category: seed.category,
+      status: history[history.length - 1].to,
+      createdAt,
+      history,
+      charges: seed.charges.map(([description, amount, daysAgo]) => ({
+        description,
+        amount,
+        at: daysBefore(daysAgo),
+      })),
+    }
+  })
 }

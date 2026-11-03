@@ -1,4 +1,5 @@
-export type Currency = "USD" | "EUR" | "GBP"
+export const CURRENCIES = ["USD", "EUR", "GBP"] as const
+export type Currency = (typeof CURRENCIES)[number]
 
 export type PaymentStatus =
   | "authorized"
@@ -81,4 +82,61 @@ export interface PaymentFilters {
   pageSize?: number
   sort?: "createdAt" | "amount"
   direction?: "asc" | "desc"
+}
+
+export type CardStatus = "active" | "frozen" | "cancelled"
+
+/** The merchant category a card is locked to at issue. */
+export type CardCategory =
+  | "advertising"
+  | "software"
+  | "travel"
+  | "office_supplies"
+  | "contractors"
+
+/** A charge on a card. Spend is the sum of these, never a stored total. */
+export interface CardCharge {
+  description: string
+  /** Integer minor units, in the card's currency. */
+  amount: number
+  /** ISO 8601, always UTC. */
+  at: string
+}
+
+/** One entry in a card's status history. `from` is null for issue. */
+export interface CardEvent {
+  from: CardStatus | null
+  to: CardStatus
+  /** ISO 8601, always UTC. */
+  at: string
+}
+
+/**
+ * A virtual card. There is deliberately no field for the full number:
+ * it exists only in the creation response.
+ */
+export interface Card {
+  id: string
+  nickname: string
+  merchantId: string
+  last4: string
+  /** Integer minor units. */
+  spendLimit: number
+  currency: Currency
+  category: CardCategory
+  status: CardStatus
+  /** ISO 8601, always UTC. */
+  createdAt: string
+  history: CardEvent[]
+  charges: CardCharge[]
+}
+
+export interface IssueCardInput {
+  nickname: string
+  merchantId: string
+  /** Integer minor units. */
+  spendLimit: number
+  currency: Currency
+  category: CardCategory
+  idempotencyKey?: string
 }

@@ -10,12 +10,13 @@ import {
 } from "@/components/Table"
 import { StatusBadge } from "@/components/ui/payments/StatusBadge"
 import { merchantById, merchants } from "@/data/merchants"
-import { queryPayments } from "@/data/queries"
-import { PaymentFilters, PaymentStatus } from "@/data/types"
+import { filterPayments, parseFilters, queryPayments } from "@/data/queries"
+import { exportScopeToken } from "@/lib/csv"
+import { PaymentStatus } from "@/data/types"
 import { formatDate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
-import { Download } from "lucide-react"
 import Link from "next/link"
+import { ExportOptionsDialog } from "./export-dialog"
 import { PaymentsFilterBar } from "./filter-bar"
 
 const STATUSES: (PaymentStatus | "all")[] = [
@@ -33,19 +34,18 @@ export default async function PaymentsPage({
   searchParams: Promise<Record<string, string | undefined>>
 }) {
   const params = await searchParams
-  const filters: PaymentFilters = {
-    status: (STATUSES.includes(params.status as PaymentStatus)
-      ? params.status
-      : "all") as PaymentFilters["status"],
-    merchantId: params.merchantId || undefined,
-    search: params.search || undefined,
-    page: Number(params.page ?? "1") || 1,
-  }
-
-  const { rows, total, page, pageCount } = queryPayments(filters)
   const query = new URLSearchParams(
     Object.entries(params).filter(([, v]) => Boolean(v)) as [string, string][],
   )
+
+  // One parser for the table and the export. Building the filters by hand here
+  // let from/to through to the export route but not to this query, so the row
+  // count and the filename the dialog promised disagreed with the file.
+  const filters = parseFilters(query)
+
+  const { rows, total, page, pageCount } = queryPayments(filters)
+  // The all-payments row count for the export dialog, from the same builder.
+  const allCount = filterPayments({}).length
 
   const pageHref = (next: number) => {
     const q = new URLSearchParams(query)
@@ -65,15 +65,12 @@ export default async function PaymentsPage({
             search: filters.search ?? "",
           }}
         />
-        <Button variant="secondary" className="w-full gap-2 py-1.5 sm:w-fit" asChild>
-          <a href={`/api/payments/export?${query.toString()}`}>
-            <Download
-              className="-ml-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-600"
-              aria-hidden="true"
-            />
-            Export
-          </a>
-        </Button>
+        <ExportOptionsDialog
+          query={query.toString()}
+          filteredCount={total}
+          allCount={allCount}
+          scopeToken={exportScopeToken(filters, "filter")}
+        />
       </div>
 
       <TableRoot className="border-t border-gray-200 dark:border-gray-800">
@@ -109,21 +106,25 @@ export default async function PaymentsPage({
                   <TableCell>
                     <Link
                       href={`/payments/${payment.id}`}
-                      className="font-medium text-blue-600 hover:underline dark:text-blue-500"
+                      className="font-mono text-[13px] tracking-tight text-blue-600 hover:underline dark:text-blue-500"
                     >
                       {payment.id}
                     </Link>
                   </TableCell>
-                  <TableCell>{merchant?.name}</TableCell>
+                  <TableCell className="font-medium text-gray-900 dark:text-gray-50">
+                    {merchant?.name}
+                  </TableCell>
                   <TableCell className="text-gray-500">
                     {payment.description}
                   </TableCell>
-                  <TableCell className="capitalize">
+                  <TableCell className="capitalize tabular-nums">
                     {payment.method === "card"
                       ? `${payment.cardBrand} •••• ${payment.last4}`
                       : payment.method.replace("_", " ")}
                   </TableCell>
-                  <TableCell>{formatDate(payment.createdAt)}</TableCell>
+                  <TableCell className="tabular-nums text-gray-600 dark:text-gray-400">
+                    {formatDate(payment.createdAt)}
+                  </TableCell>
                   <TableCell className="text-right font-medium tabular-nums text-gray-900 dark:text-gray-50">
                     {formatMoney(payment.amount, payment.currency)}
                   </TableCell>
@@ -138,7 +139,7 @@ export default async function PaymentsPage({
       </TableRoot>
 
       <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm tabular-nums text-gray-500">
           {total.toLocaleString()} payments · page {page} of {pageCount}
         </p>
         <div className="flex gap-2">

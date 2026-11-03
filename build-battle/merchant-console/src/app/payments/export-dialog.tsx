@@ -61,7 +61,13 @@ export function ExportDialog({
     })
 
   return (
-    <Drawer>
+    <Drawer
+      onOpenChange={(open) => {
+        if (!open) return
+        setScope("filter")
+        setSelected(new Set(DEFAULT_EXPORT_COLUMNS))
+      }}
+    >
       <DrawerTrigger asChild>
         <Button variant="secondary" className="w-full gap-2 py-1.5 sm:w-fit">
           <Download
@@ -120,7 +126,7 @@ export function ExportDialog({
         </DrawerBody>
         <DrawerFooter className="items-center">
           {columns.length === 0 && (
-            <p id="export-columns-hint" className="mb-2 text-sm text-gray-500 sm:mb-0 sm:mr-auto">
+            <p id="export-columns-hint" role="status" className="mb-2 text-sm text-gray-500 sm:mb-0 sm:mr-auto">
               Choose at least one column.
             </p>
           )}

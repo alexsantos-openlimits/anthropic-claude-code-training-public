@@ -83,7 +83,7 @@ function cell(payment: Payment, column: ExportColumn): string {
 
 export function toCsv(
   payments: Payment[],
-  columns: readonly ExportColumn[] = EXPORT_COLUMNS,
+  columns: readonly ExportColumn[] = EXPORT_COLUMNS, // default includes last4: callers exporting to users must pass columns explicitly
 ): string {
   const header = columns.join(",")
   const rows = payments.map((payment) =>

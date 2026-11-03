@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { Payment } from "@/data/types"
-import { EXPORT_COLUMNS, exportFilename, toCsv } from "./csv"
+import {
+  DEFAULT_EXPORT_COLUMNS,
+  EXPORT_COLUMNS,
+  exportFilename,
+  parseExportColumns,
+  toCsv,
+} from "./csv"
 
 /**
  * The export is the file ops hands to a merchant, so a broken cell is a
@@ -76,10 +82,67 @@ describe("toCsv", () => {
   })
 })
 
+describe("parseExportColumns", () => {
+  it("keeps a requested subset in the order it was asked for", () => {
+    const selection = parseExportColumns("amount,id,currency")
+    expect(selection).toEqual({
+      ok: true,
+      columns: ["amount", "id", "currency"],
+    })
+    if (!selection.ok) throw new Error("expected a valid selection")
+    expect(toCsv([payment], selection.columns)).toBe(
+      ["amount,id,currency", "$250.00,pay_0001,USD"].join("\n"),
+    )
+  })
+
+  it("trims whitespace and drops duplicates, keeping the first position", () => {
+    expect(parseExportColumns(" id , amount,id ")).toEqual({
+      ok: true,
+      columns: ["id", "amount"],
+    })
+  })
+
+  it("leaves the card last four out by default", () => {
+    const selection = parseExportColumns(null)
+    if (!selection.ok) throw new Error("expected the default selection")
+    expect(selection.columns).toEqual([...DEFAULT_EXPORT_COLUMNS])
+    expect(selection.columns).not.toContain("last4")
+
+    const [header, row] = toCsv([payment], selection.columns).split("\n")
+    expect(header.split(",")).not.toContain("last4")
+    expect(row).not.toContain("4242")
+  })
+
+  it("includes last four only when it is asked for", () => {
+    expect(parseExportColumns("id,last4")).toEqual({
+      ok: true,
+      columns: ["id", "last4"],
+    })
+  })
+
+  it("rejects an empty selection rather than producing an empty file", () => {
+    expect(parseExportColumns("").ok).toBe(false)
+    expect(parseExportColumns(" , ,").ok).toBe(false)
+  })
+
+  it("rejects any column outside the allowlist", () => {
+    const selection = parseExportColumns("id,pan")
+    expect(selection.ok).toBe(false)
+    if (selection.ok) return
+    expect(selection.error).not.toContain("pan")
+  })
+})
+
 describe("exportFilename", () => {
   it("stamps the UTC date, so two exports on the same day collide by design", () => {
     expect(exportFilename(new Date("2026-03-14T23:00:00.000Z"))).toBe(
       "payments-2026-03-14.csv",
     )
+  })
+
+  it("names the scope when given a label", () => {
+    expect(
+      exportFilename(new Date("2026-08-13T12:00:00.000Z"), "disputed"),
+    ).toBe("payments-disputed-2026-08-13.csv")
   })
 })

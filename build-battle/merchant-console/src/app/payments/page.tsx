@@ -10,7 +10,7 @@ import {
 } from "@/components/Table"
 import { StatusBadge } from "@/components/ui/payments/StatusBadge"
 import { merchantById, merchants } from "@/data/merchants"
-import { filterPayments, queryPayments } from "@/data/queries"
+import { filterPayments, parseFilters, queryPayments } from "@/data/queries"
 import { exportScopeToken } from "@/lib/csv"
 import { PaymentFilters, PaymentStatus } from "@/data/types"
 import { formatDate } from "@/lib/dates"
@@ -34,21 +34,18 @@ export default async function PaymentsPage({
   searchParams: Promise<Record<string, string | undefined>>
 }) {
   const params = await searchParams
-  const filters: PaymentFilters = {
-    status: (STATUSES.includes(params.status as PaymentStatus)
-      ? params.status
-      : "all") as PaymentFilters["status"],
-    merchantId: params.merchantId || undefined,
-    search: params.search || undefined,
-    page: Number(params.page ?? "1") || 1,
-  }
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => Boolean(v)) as [string, string][],
+  )
+
+  // One parser for the table and the export. Building the filters by hand here
+  // let from/to through to the export route but not to this query, so the row
+  // count and the filename the dialog promised disagreed with the file.
+  const filters = parseFilters(query)
 
   const { rows, total, page, pageCount } = queryPayments(filters)
   // The all-payments row count for the export dialog, from the same builder.
   const allCount = filterPayments({}).length
-  const query = new URLSearchParams(
-    Object.entries(params).filter(([, v]) => Boolean(v)) as [string, string][],
-  )
 
   const pageHref = (next: number) => {
     const q = new URLSearchParams(query)

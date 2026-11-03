@@ -98,9 +98,9 @@ function cell(payment: Payment, column: ExportColumn): string {
 export function projectRows(
   payments: Payment[],
   columns: readonly ExportColumn[] = EXPORT_COLUMNS,
-): Record<ExportColumn, string>[] {
+): Partial<Record<ExportColumn, string>>[] {
   return payments.map((payment) => {
-    const row = {} as Record<ExportColumn, string>
+    const row: Partial<Record<ExportColumn, string>> = {}
     for (const column of columns) row[column] = cell(payment, column)
     return row
   })
@@ -112,7 +112,7 @@ export function toCsv(
 ): string {
   const header = columns.join(",")
   const rows = projectRows(payments, columns).map((row) =>
-    columns.map((column) => escapeCell(row[column])).join(","),
+    columns.map((column) => escapeCell(row[column] ?? "")).join(","),
   )
   return [header, ...rows].join("\n")
 }

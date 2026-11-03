@@ -37,3 +37,20 @@ Work is submitted as a pull request against this repository and scored automatic
 - Branch from `main` with the ticket ID: `NWP-201-issue-cards`
 - Commit subjects carry the ticket ID: `NWP-201: issue virtual cards`
 - Fill in the pull request template. The grader reads it.
+
+## Release Standards
+
+Three rules every change is held to on its way to `main`. Each names what a
+violation looks like, so a reviewer can cite it.
+
+1. **Test evidence before merge.** A pull request states the command that was run
+   and the result it produced — the `npm test` summary line, pasted. "Tests pass"
+   without the output is not evidence, and a claim about a check that was not run
+   is the violation, not the failing check.
+2. **No direct commits to `main`.** Every change reaches `main` through a pull
+   request from a ticket branch. A commit whose first parent is `main` and that
+   belongs to no PR is a violation, however small the change.
+3. **Every pull request carries a one-line business-impact summary.** One sentence,
+   at the top of the description, in the language the person who reported the ticket
+   would use: who is unblocked and what it saves them. A summary that only restates
+   the diff ("refactors the export route") does not meet this.

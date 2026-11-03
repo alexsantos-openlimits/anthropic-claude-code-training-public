@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { Payment, PaymentFilters } from "@/data/types"
-import { DEFAULT_EXPORT_COLUMNS, EXPORT_COLUMNS, exportFilename, exportLabel, parseExportColumns, toCsv } from "./csv"
+import { DEFAULT_EXPORT_COLUMNS, EXPORT_COLUMNS, exportFilename, exportHref, exportLabel, parseExportColumns, toCsv } from "./csv"
 
 /**
  * The export is the file ops hands to a merchant, so a broken cell is a
@@ -122,5 +122,19 @@ describe("exportLabel", () => {
     [{ status: "failed", search: "a", merchantId: "mch_missing" }, "failed-filtered"],
   ])("labels %j as %s", (filters, label) => {
     expect(exportLabel(filters)).toBe(label)
+  })
+})
+
+describe("exportHref", () => {
+  it("keeps the current filters but not the table page", () => {
+    expect(exportHref("status=disputed&page=3", "filter", ["id", "amount"])).toBe(
+      "/api/payments/export?status=disputed&columns=id%2Camount",
+    )
+  })
+
+  it("drops every filter for all payments", () => {
+    expect(exportHref("status=disputed&merchantId=mch_03", "all", ["id"])).toBe(
+      "/api/payments/export?columns=id",
+    )
   })
 })

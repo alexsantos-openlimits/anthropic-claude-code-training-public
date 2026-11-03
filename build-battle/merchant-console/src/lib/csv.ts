@@ -39,6 +39,18 @@ export function parseExportColumns(raw: string | null): ExportColumn[] | null {
   return valid ? (parts as ExportColumn[]) : null
 }
 
+/** Download link for the export drawer: current filters (minus table page) or none, plus the chosen columns. */
+export function exportHref(
+  filterQuery: string,
+  scope: "filter" | "all",
+  columns: readonly ExportColumn[],
+): string {
+  const params = new URLSearchParams(scope === "filter" ? filterQuery : "")
+  params.delete("page")
+  params.set("columns", columns.join(","))
+  return `/api/payments/export?${params}`
+}
+
 function escapeCell(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
   return value

@@ -82,3 +82,6 @@ export interface PaymentFilters {
   sort?: "createdAt" | "amount"
   direction?: "asc" | "desc"
 }
+
+/** Which rows an export covers: the table's current filter, or every payment. */
+export type ExportScope = "filter" | "all"

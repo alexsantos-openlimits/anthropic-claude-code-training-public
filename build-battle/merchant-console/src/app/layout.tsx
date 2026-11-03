@@ -1,6 +1,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/Sidebar"
 import { AppSidebar } from "@/components/ui/navigation/AppSidebar"
 import { Breadcrumbs } from "@/components/ui/navigation/Breadcrumbs"
+import { ViewControls } from "@/components/ui/navigation/ViewControls"
 import type { Metadata } from "next"
 import { ThemeProvider } from "next-themes"
 import localFont from "next/font/local"
@@ -75,6 +76,7 @@ export default async function RootLayout({
                 <SidebarTrigger className="-ml-1" />
                 <div className="mr-2 h-4 w-px bg-gray-200 dark:bg-gray-800" />
                 <Breadcrumbs />
+                <ViewControls />
               </header>
               <main className="min-h-[calc(100vh-4rem)] bg-white dark:bg-gray-925">
                 {children}

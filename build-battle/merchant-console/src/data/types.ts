@@ -82,3 +82,35 @@ export interface PaymentFilters {
   sort?: "createdAt" | "amount"
   direction?: "asc" | "desc"
 }
+
+export type CardStatus = "active" | "frozen" | "cancelled"
+
+/** One line of a card's history. Times are UTC, like everything stored. */
+export interface CardEvent {
+  /** ISO 8601, always UTC. */
+  at: string
+  action: "issued" | "frozen" | "unfrozen" | "cancelled"
+  from: CardStatus | null
+  to: CardStatus
+}
+
+export interface Card {
+  id: string
+  nickname: string
+  merchantId: string
+  /** Spend limit in integer minor units. Never a float. */
+  limit: number
+  /** Always the merchant's own settlement currency. */
+  currency: Currency
+  status: CardStatus
+  /** The last four of the generated number. The number itself is never stored. */
+  last4: string
+  /** Opaque reference to the generated number, for support to quote. */
+  reference: string
+  categoryLock: string | null
+  /** Integer minor units spent against the limit. A new card has spent nothing. */
+  spent: number
+  /** ISO 8601, always UTC. */
+  createdAt: string
+  events: CardEvent[]
+}

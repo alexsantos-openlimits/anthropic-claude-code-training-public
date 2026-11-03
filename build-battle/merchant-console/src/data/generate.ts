@@ -1,5 +1,8 @@
-import { merchants } from "./merchants"
+import { generateCardNumber } from "@/lib/cards"
+import { merchantById, merchants } from "./merchants"
 import {
+  Card,
+  CardEvent,
   Currency,
   Dispute,
   Payment,
@@ -190,4 +193,67 @@ function generatePayouts(payments: Payment[]): Payout[] {
   }
 
   return payouts
+}
+
+const daysBefore = (days: number) =>
+  new Date(GENERATED_AT.getTime() - days * 86_400_000).toISOString()
+
+/**
+ * Demo cards, so the list and the spend bar have something real on first
+ * load. Spend is fixed per card; nothing in the console records card spend
+ * yet. Numbers come from the same 4242 generator the issue route uses.
+ */
+export function generateCards(): Card[] {
+  const seeds: {
+    nickname: string
+    merchantId: string
+    spendLimit: number
+    spent: number
+    issuedDaysAgo: number
+    history?: Omit<CardEvent, "at"> & { daysAgo: number }
+  }[] = [
+    { nickname: "Google Ads, always on", merchantId: "mch_01", spendLimit: 500000, spent: 412500, issuedDaysAgo: 40 },
+    { nickname: "Design tool seats", merchantId: "mch_04", spendLimit: 120000, spent: 36000, issuedDaysAgo: 25 },
+    {
+      nickname: "Contractor tools",
+      merchantId: "mch_05",
+      spendLimit: 250000,
+      spent: 0,
+      issuedDaysAgo: 60,
+      history: { from: "active", to: "frozen", daysAgo: 6 },
+    },
+    {
+      nickname: "Trade show deposit",
+      merchantId: "mch_07",
+      spendLimit: 1000000,
+      spent: 640000,
+      issuedDaysAgo: 75,
+      history: { from: "active", to: "cancelled", daysAgo: 20 },
+    },
+    { nickname: "Storefront apps", merchantId: "mch_10", spendLimit: 30000, spent: 29900, issuedDaysAgo: 10 },
+  ]
+
+  return seeds.map((seed, index) => {
+    const createdAt = daysBefore(seed.issuedDaysAgo)
+    const history: CardEvent[] = [{ from: null, to: "active", at: createdAt }]
+    if (seed.history) {
+      history.push({
+        from: seed.history.from,
+        to: seed.history.to,
+        at: daysBefore(seed.history.daysAgo),
+      })
+    }
+    return {
+      id: `crd_${pad(index + 1, 4)}`,
+      nickname: seed.nickname,
+      merchantId: seed.merchantId,
+      last4: generateCardNumber(rand).slice(-4),
+      spendLimit: seed.spendLimit,
+      spent: seed.spent,
+      currency: merchantById(seed.merchantId)!.currency,
+      status: history[history.length - 1].to,
+      createdAt,
+      history,
+    }
+  })
 }

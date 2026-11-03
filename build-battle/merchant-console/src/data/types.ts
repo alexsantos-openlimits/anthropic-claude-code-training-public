@@ -1,4 +1,5 @@
-export type Currency = "USD" | "EUR" | "GBP"
+export const CURRENCIES = ["USD", "EUR", "GBP"] as const
+export type Currency = (typeof CURRENCIES)[number]
 
 export type PaymentStatus =
   | "authorized"
@@ -81,4 +82,43 @@ export interface PaymentFilters {
   pageSize?: number
   sort?: "createdAt" | "amount"
   direction?: "asc" | "desc"
+}
+
+export type CardStatus = "active" | "frozen" | "cancelled"
+
+/** One entry in a card's status history. `from` is null for issue. */
+export interface CardEvent {
+  from: CardStatus | null
+  to: CardStatus
+  /** ISO 8601, always UTC. */
+  at: string
+}
+
+/**
+ * A virtual card. There is deliberately no field for the full number:
+ * it exists only in the creation response.
+ */
+export interface Card {
+  id: string
+  nickname: string
+  merchantId: string
+  last4: string
+  /** Integer minor units. */
+  spendLimit: number
+  /** Integer minor units. */
+  spent: number
+  currency: Currency
+  status: CardStatus
+  /** ISO 8601, always UTC. */
+  createdAt: string
+  history: CardEvent[]
+}
+
+export interface IssueCardInput {
+  nickname: string
+  merchantId: string
+  /** Integer minor units. */
+  spendLimit: number
+  currency: Currency
+  idempotencyKey?: string
 }

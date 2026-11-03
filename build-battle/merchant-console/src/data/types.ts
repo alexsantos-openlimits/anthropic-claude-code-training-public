@@ -11,6 +11,37 @@ export type DisputeStatus = "needs_response" | "under_review" | "won" | "lost"
 
 export type PayoutStatus = "paid" | "in_transit" | "pending"
 
+/** `active ⇄ frozen`, either to `cancelled`, and `cancelled` is terminal. */
+export type CardStatus = "active" | "frozen" | "cancelled"
+
+export type CardCategory = "software" | "advertising" | "contractors" | "travel"
+
+export interface CardEvent {
+  type: "issued" | "frozen" | "unfrozen" | "cancelled"
+  /** ISO 8601, always UTC. */
+  at: string
+}
+
+export interface Card {
+  id: string
+  nickname: string
+  merchantId: string
+  /** The full number is never stored. Last four and the issuer reference only. */
+  last4: string
+  panReference: string
+  /** Integer minor units. */
+  limit: number
+  /** Integer minor units, in the card's currency. */
+  spent: number
+  currency: Currency
+  status: CardStatus
+  /** Null means the card is not locked to a category. */
+  category: CardCategory | null
+  /** ISO 8601, always UTC. */
+  createdAt: string
+  events: CardEvent[]
+}
+
 export interface Merchant {
   id: string
   name: string

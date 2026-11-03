@@ -1,5 +1,6 @@
 import { merchants } from "./merchants"
 import {
+  Card,
   Currency,
   Dispute,
   Payment,
@@ -190,4 +191,82 @@ function generatePayouts(payments: Payment[]): Payout[] {
   }
 
   return payouts
+}
+
+const daysBefore = (days: number, hourUtc: number) =>
+  new Date(
+    GENERATED_AT.getTime() - days * 86_400_000 + hourUtc * 3_600_000,
+  ).toISOString()
+
+/**
+ * Demo virtual cards. Fixed literals rather than PRNG draws: calling `rand()`
+ * here would shift every payment generated after it. Last four and issuer
+ * reference only; seeded cards never had a full number to reveal.
+ */
+export function seedCards(): Card[] {
+  return [
+    {
+      id: "card_0001",
+      nickname: "Figma seats",
+      merchantId: "mch_01",
+      last4: "4417",
+      panReference: "pan_ref_seed_0001",
+      limit: 50000,
+      spent: 18900,
+      currency: "USD",
+      status: "active",
+      category: "software",
+      createdAt: daysBefore(42, 14),
+      events: [{ type: "issued", at: daysBefore(42, 14) }],
+    },
+    {
+      id: "card_0002",
+      nickname: "Meta ads Q3",
+      merchantId: "mch_05",
+      last4: "0938",
+      panReference: "pan_ref_seed_0002",
+      limit: 250000,
+      spent: 212450,
+      currency: "EUR",
+      status: "active",
+      category: "advertising",
+      createdAt: daysBefore(30, 8),
+      events: [{ type: "issued", at: daysBefore(30, 8) }],
+    },
+    {
+      id: "card_0003",
+      nickname: "Contractor tools",
+      merchantId: "mch_04",
+      last4: "7731",
+      panReference: "pan_ref_seed_0003",
+      limit: 120000,
+      spent: 30000,
+      currency: "GBP",
+      status: "frozen",
+      category: "contractors",
+      createdAt: daysBefore(56, 10),
+      events: [
+        { type: "issued", at: daysBefore(56, 10) },
+        { type: "frozen", at: daysBefore(9, 16) },
+      ],
+    },
+    {
+      id: "card_0004",
+      nickname: "Trade show travel",
+      merchantId: "mch_07",
+      last4: "2265",
+      panReference: "pan_ref_seed_0004",
+      limit: 300000,
+      spent: 146020,
+      currency: "USD",
+      status: "cancelled",
+      category: "travel",
+      createdAt: daysBefore(70, 18),
+      events: [
+        { type: "issued", at: daysBefore(70, 18) },
+        { type: "frozen", at: daysBefore(20, 21) },
+        { type: "cancelled", at: daysBefore(14, 17) },
+      ],
+    },
+  ]
 }

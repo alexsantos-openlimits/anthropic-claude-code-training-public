@@ -1,13 +1,13 @@
 import { merchantById } from "@/data/merchants"
-import { Payment } from "@/data/types"
+import { Payment, PaymentFilters } from "@/data/types"
 import { formatMoney } from "./money"
 
 /**
  * CSV export for the payments table.
  *
- * The column set is fixed. Ops has asked for control over it — that is
- * NWP-101 — but today everyone gets every column, including the card
- * last four, whether or not the file is going to a merchant.
+ * Ops chooses the columns and the scope (NWP-101). Column names arrive from
+ * the client, so `parseColumns` checks them against EXPORT_COLUMNS before
+ * they reach the serializer. The card last four is off unless asked for.
  */
 
 export const EXPORT_COLUMNS = [
@@ -24,6 +24,41 @@ export const EXPORT_COLUMNS = [
 ] as const
 
 export type ExportColumn = (typeof EXPORT_COLUMNS)[number]
+
+/** What ships when the client does not choose: everything but the last four. */
+export const DEFAULT_EXPORT_COLUMNS: readonly ExportColumn[] =
+  EXPORT_COLUMNS.filter((column) => column !== "last4")
+
+export const EXPORT_SCOPES = ["filtered", "all"] as const
+
+export type ExportScope = (typeof EXPORT_SCOPES)[number]
+
+/**
+ * Validate a comma-separated `columns` param against the allowlist.
+ *
+ * Missing means the default set. Present but empty is an explicit empty
+ * selection, returned as `[]` so the caller can refuse it. Any unknown name
+ * rejects the whole request with `null`. Order is kept; duplicates are dropped.
+ */
+export function parseColumns(raw: string | null): ExportColumn[] | null {
+  if (raw === null) return [...DEFAULT_EXPORT_COLUMNS]
+
+  const names = raw
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+
+  const columns: ExportColumn[] = []
+  for (const name of names) {
+    if (!EXPORT_COLUMNS.includes(name as ExportColumn)) return null
+    if (!columns.includes(name as ExportColumn)) columns.push(name as ExportColumn)
+  }
+  return columns
+}
+
+export function parseScope(raw: string | null): ExportScope {
+  return raw === "all" ? "all" : "filtered"
+}
 
 function escapeCell(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
@@ -66,6 +101,27 @@ export function toCsv(
   return [header, ...rows].join("\n")
 }
 
-export function exportFilename(date = new Date()): string {
-  return `payments-${date.toISOString().slice(0, 10)}.csv`
+/**
+ * A filename-safe description of what an export contains, built only from
+ * validated values. Search text and dates are free-form client input, so
+ * they never reach the filename; they read as "filtered".
+ */
+export function exportLabel(filters: PaymentFilters, scope: ExportScope): string {
+  if (scope === "all") return "all"
+
+  const parts: string[] = []
+  if (filters.status && filters.status !== "all") parts.push(filters.status)
+  const merchant = filters.merchantId ? merchantById(filters.merchantId) : undefined
+  if (merchant) parts.push(merchant.id)
+
+  if (parts.length === 0) {
+    const filtered = filters.search || filters.from || filters.to || filters.merchantId
+    return filtered ? "filtered" : "all"
+  }
+  return parts.join("-").toLowerCase().replace(/[^a-z0-9_-]/g, "")
+}
+
+export function exportFilename(date = new Date(), label?: string): string {
+  const day = date.toISOString().slice(0, 10)
+  return label ? `payments-${label}-${day}.csv` : `payments-${day}.csv`
 }
